@@ -4,7 +4,7 @@
 # 全局设置
 settings:
   # 默认数据库方言
-  default_dialect: "mysql"
+  default_dialect: "postgresql"
   # 默认用户角色
   default_role: "editor"
   # 连接超时 (秒)
@@ -22,18 +22,29 @@ settings:
 # 密码通过环境变量管理，禁止在此处明文存储
 databases:
   instances:
-    # --- 示例: MySQL 实例 ---
-    - name: "mysql_dev"
-      type: "mysql"
+    # --- 测试实例: PostgreSQL 15 (Docker) ---
+    - name: "pg_test"
+      type: "postgresql"
       host: "localhost"
-      port: 3306
-      database: "dev_db"
-      readonly_user: "readonly_user"
-      readonly_user_env: "DBA_MYSQL_DEV_RO_USER"
-      readonly_pass_env: "DBA_MYSQL_DEV_RO_PASS"
-      admin_user_env: "DBA_MYSQL_DEV_ADMIN_USER"
-      admin_pass_env: "DBA_MYSQL_DEV_ADMIN_PASS"
+      port: 5437
+      database: "health_db_kimi"
+      readonly_user_env: "DBA_PG_TEST_RO_USER"
+      readonly_pass_env: "DBA_PG_TEST_RO_PASS"
+      admin_user_env: "DBA_PG_TEST_ADMIN_USER"
+      admin_pass_env: "DBA_PG_TEST_ADMIN_PASS"
       timeout: 30
+
+    # --- 示例: MySQL 实例 ---
+    # - name: "mysql_dev"
+    #   type: "mysql"
+    #   host: "localhost"
+    #   port: 3306
+    #   database: "dev_db"
+    #   readonly_user_env: "DBA_MYSQL_DEV_RO_USER"
+    #   readonly_pass_env: "DBA_MYSQL_DEV_RO_PASS"
+    #   admin_user_env: "DBA_MYSQL_DEV_ADMIN_USER"
+    #   admin_pass_env: "DBA_MYSQL_DEV_ADMIN_PASS"
+    #   timeout: 30
 
     # --- 示例: PostgreSQL 实例 ---
     # - name: "pg_prod"
