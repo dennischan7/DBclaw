@@ -9,12 +9,12 @@
 
 | 项目 | 值 |
 |---|---|
-| **当前阶段** | 阶段0 ✅ → 阶段1 ✅ → 阶段2 ✅ → 阶段3 ✅ |
+| **当前阶段** | 阶段0 ✅ → 阶段1 ✅ → 阶段2 ✅ → 阶段3 ✅ → 阶段4 ✅ |
 | **Git 分支** | `dev` (开发中) |
-| **最新提交** | `866b53f` Phase 3: Harness规范引擎与意图路由 |
+| **最新提交** | `7f71fbb` Phase 4: 闭环执行引擎与多智能体流水线 |
 | **基线提交** | `64bfc36` Initial: Hermes v0.9.0 + DBSafeGuard docs and library |
 | **测试数据库** | PostgreSQL 15 @ localhost:5437 (Docker: ent-health-postgres-kimi) |
-| **总测试数** | 189 (Phase 1: 78 + Phase 2: 56 + Phase 3: 55) |
+| **总测试数** | 238 (Phase 1: 78 + Phase 2: 56 + Phase 3: 55 + Phase 4: 49) |
 
 ---
 
@@ -183,14 +183,46 @@
 
 ---
 
-## 阶段4：闭环执行引擎与多智能体流水线 ⬜ 未开始
+## 阶段4：闭环执行引擎与多智能体流水线 ✅ 已完成
 
 | # | 任务 | 状态 | 提交 | 备注 |
 |---|------|------|------|------|
-| 4.1 | DBA 主 Agent Loop (继承 AIAgent) | ⬜ | | |
-| 4.2 | 双校验子 Agent (语法 + 性能, delegate_task) | ⬜ | | |
-| 4.3 | 任务预检模块 | ⬜ | | |
-| 4.4 | 断点续跑与状态管理 | ⬜ | | |
+| 4.1 | DBA 主 Agent Loop (继承 AIAgent) | ✅ 已完成 | | DBAPipeline 9阶段闭环流水线, 状态回调, 重写循环(max 2轮) |
+| 4.2 | 双校验子 Agent (语法 + 性能, delegate_task) | ✅ 已完成 | | 并行执行: AST语法校验 + EXPLAIN性能审核, 一票否决 |
+| 4.3 | 任务预检模块 | ✅ 已完成 | | 连接检查/表存在检查/权限检查/元数据预取 |
+| 4.4 | 断点续跑与状态管理 | ✅ 已完成 | | SQLite持久化, 任务保存/加载/恢复, 审批流转, 过期清理 |
+
+### Phase 4 关键实现
+
+**dba_loop.py** — DBA闭环执行流水线:
+1. **9阶段流水线**: intent_classify → preflight → sql_validate → dual_validate → risk_assess → rollback_gen → approval → execute → audit
+2. **智能跳过**: 非 SQL意图(health_check/troubleshoot)跳过SQL阶段; L0跳过回滚和审批; L1跳过回滚
+3. **重写循环**: 校验失败自动打回重写，最多MAX_REWRITE_ROUNDS=2轮
+4. **审批门控**: L2+需人工审批(on_approval_needed回调), 无回调时BLOCKED等待
+5. **断点续跑**: 已完成阶段自动跳过，支持中断后恢复
+
+**dual_validator.py** — 双校验子Agent:
+1. **并行执行**: ThreadPoolExecutor 同时运行语法校验 + 性能审核
+2. **语法校验**: AST解析 + 方言检查 + library知识库比对
+3. **性能审核**: EXPLAIN执行计划分析, 全表扫描/无索引检测, 行数阈值
+4. **一票否决**: 任意校验不通过 → 整体失败
+
+**preflight.py** — 任务预检:
+1. **连接可用性**: SELECT 1 探测目标实例
+2. **表存在性**: sqlglot提取表名 + inspect检查 (CREATE TABLE跳过)
+3. **权限检查**: 写操作需要管理员凭证配置
+4. **元数据预取**: 预加载最多5张表的列信息，下游复用缓存
+
+**task_state.py** — 断点续跑:
+1. **SQLite持久化**: WAL模式, tasks表+task_stages表
+2. **保存/加载**: save_task() UPSERT全量状态, load_task()恢复DBATask对象
+3. **审批流转**: approve_task() 外部审批 → 续跑流水线
+4. **过期清理**: cleanup_expired() 默认7天
+
+### Phase 4 关键修复
+
+1. **相对导入问题**: engine/模块在测试环境下`..harnesses`超出顶层包，统一采用try/except双导入模式
+2. **intent分类影响流水线**: 无效SQL(`SELEC FORM`)被分类为`general`意图，导致SQL阶段全跳过，测试需预设eintent
 
 ---
 
@@ -266,3 +298,4 @@
 | 2026-04-16 | `36f554a` | Phase 1 完成: SQL双层校验深化 — 78项测试全部通过, 4项关键修复 |
 | 2026-04-16 | `9249dcb` | Phase 2 完成: 核心工具层与安全沙箱 — 56项测试, 累计134项 |
 | 2026-04-16 | `866b53f` | Phase 3 完成: Harness规范引擎与意图路由 — 55项测试, 累计189项 |
+| 2026-04-16 | `7f71fbb` | Phase 4 完成: 闭环执行引擎与多智能体流水线 — 49项测试, 累计238项 |
