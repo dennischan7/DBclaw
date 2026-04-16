@@ -9,12 +9,12 @@
 
 | 项目 | 值 |
 |---|---|
-| **当前阶段** | 阶段0 ✅ → 阶段1 ✅ → 阶段2 ✅ → 阶段3 ✅ → 阶段4 ✅ → 阶段5 ✅ |
+| **当前阶段** | 阶段0 ✅ → 阶段1 ✅ → 阶段2 ✅ → 阶段3 ✅ → 阶段4 ✅ → 阶段5 ✅ → 阶段6 ✅ |
 | **Git 分支** | `dev` (开发中) |
-| **最新提交** | `dd396bf` Phase 5: 企业级多级记忆中枢 |
+| **最新提交** | `2be9f7b` Phase 6: 自进化DBA技能体系 |
 | **基线提交** | `64bfc36` Initial: Hermes v0.9.0 + DBSafeGuard docs and library |
 | **测试数据库** | PostgreSQL 15 @ localhost:5437 (Docker: ent-health-postgres-kimi) |
-| **总测试数** | 299 (Phase 1: 78 + Phase 2: 56 + Phase 3: 55 + Phase 4: 49 + Phase 5: 61) |
+| **总测试数** | 334 (Phase 1: 78 + Phase 2: 56 + Phase 3: 55 + Phase 4: 49 + Phase 5: 61 + Phase 6: 35) |
 
 ---
 
@@ -285,14 +285,49 @@ tests/
 
 ---
 
-## 阶段6：自进化DBA技能体系 ⬜ 未开始
+## 阶段6：自进化DBA技能体系 ✅ 已完成
 
 | # | 任务 | 状态 | 提交 | 备注 |
 |---|------|------|------|------|
-| 6.1 | DBA 内置技能库完善 | ⬜ | | |
-| 6.2 | 自主技能生成机制 | ⬜ | | |
-| 6.3 | 技能自我优化 + 版本管理 | ⬜ | | |
-| 6.4 | 技能权限管控 | ⬜ | | |
+| 6.1 | DBA 内置技能库完善 | ✅ 已完成 | | 5个内置技能元数据注册, Hermes SKILL.md兼容格式 |
+| 6.2 | 自主技能生成机制 | ✅ 已完成 | | 4种触发条件, SKILL.md模板生成, pending→confirmed人工确认 |
+| 6.3 | 技能自我优化 + 版本管理 | ✅ 已完成 | | 执行效果评估, patch生成, 版本递增, 全历史保留+回滚 |
+| 6.4 | 技能权限管控 | ✅ 已完成 | | ADMIN/DEVELOPER/READONLY三级角色, 按risk_level过滤 |
+
+### Phase 6 关键实现
+
+**skill_manager.py** — 统一技能生命周期管理:
+1. **内置技能注册**: 5个DBA技能自动注册 (sql-safe/ddl-change/health-check/index-optimize/troubleshoot)
+2. **三级角色权限**: UserRole(ADMIN>DEVELOPER>READONLY), 按min_role过滤技能可见性
+3. **版本管理**: save_version/get_versions/rollback_version, 保留全部历史版本
+4. **启用/禁用**: enable_skill/disable_skill, 禁用技能AI不可调用
+5. **执行统计**: record_execution + get_execution_stats (成功率/平均耗时/最后使用)
+6. **草案管理**: save_draft/confirm_draft/reject_draft (for generator)
+7. **补丁管理**: save_patch/confirm_patch/reject_patch (for optimizer)
+
+**skill_generator.py** — 技能自动生成:
+1. **4种触发条件**: repeated_success(同类≥2次) / self_repair(重写后成功) / user_correction(用户纠正) / efficient_solution
+2. **SKILL.md生成**: YAML frontmatter + 工作流 + SQL模板 + 安全规则
+3. **人工确认流程**: generate_draft()→pending → confirm_draft()→install+版本化
+4. **L3经验集成**: 从L3 experience_store检索相关经验作为技能参考
+
+**skill_optimizer.py** — 技能自优化:
+1. **效果评估**: evaluate_effectiveness() 基于执行统计(成功率<80%触发优化)
+2. **补丁生成**: generate_patch() — append式补丁,不删除原内容,不降级安全规则
+3. **版本递增**: confirm_optimization()→版本patch号+1 (1.0.0→1.0.1)
+4. **人工确认**: 所有优化必须用户确认后才生效
+
+### Phase 6 新增文件
+
+```
+skill_engine/
+├── __init__.py              # 技能引擎包
+├── skill_manager.py         # 统一管理器 (~420 lines)
+├── skill_generator.py       # 自动生成器 (~220 lines)
+└── skill_optimizer.py       # 自优化器 (~180 lines)
+tests/
+└── test_phase6.py           # 35项测试 (~350 lines)
+```
 
 ---
 
@@ -347,3 +382,5 @@ tests/
 | 2026-04-16 | `9249dcb` | Phase 2 完成: 核心工具层与安全沙箱 — 56项测试, 累计134项 |
 | 2026-04-16 | `866b53f` | Phase 3 完成: Harness规范引擎与意图路由 — 55项测试, 累计189项 |
 | 2026-04-16 | `7f71fbb` | Phase 4 完成: 闭环执行引擎与多智能体流水线 — 49项测试, 累计238项 |
+| 2026-04-16 | `a7431d4` | Phase 5 完成: 企业级多级记忆中枢 — 61项测试, 累计299项 |
+| 2026-04-16 | `2be9f7b` | Phase 6 完成: 自进化DBA技能体系 — 35项测试, 累计334项 |
