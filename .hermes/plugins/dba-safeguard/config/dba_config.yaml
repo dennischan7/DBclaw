@@ -1,0 +1,71 @@
+# DBA SafeGuard Configuration
+# 数据库实例配置 + 全局选项
+
+# 全局设置
+settings:
+  # 默认数据库方言
+  default_dialect: "mysql"
+  # 默认用户角色
+  default_role: "editor"
+  # 连接超时 (秒)
+  connection_timeout: 30
+  # 执行超时 (秒)
+  execution_timeout: 60
+  # 审计日志保留天数 (0=永久)
+  audit_retention_days: 0
+  # 是否启用L4经验记忆
+  enable_l4_memory: true
+  # library/ 知识库根目录(相对于项目根)
+  library_root: "library"
+
+# 数据库实例配置
+# 密码通过环境变量管理，禁止在此处明文存储
+databases:
+  instances:
+    # --- 示例: MySQL 实例 ---
+    - name: "mysql_dev"
+      type: "mysql"
+      host: "localhost"
+      port: 3306
+      database: "dev_db"
+      readonly_user: "readonly_user"
+      readonly_user_env: "DBA_MYSQL_DEV_RO_USER"
+      readonly_pass_env: "DBA_MYSQL_DEV_RO_PASS"
+      admin_user_env: "DBA_MYSQL_DEV_ADMIN_USER"
+      admin_pass_env: "DBA_MYSQL_DEV_ADMIN_PASS"
+      timeout: 30
+
+    # --- 示例: PostgreSQL 实例 ---
+    # - name: "pg_prod"
+    #   type: "postgresql"
+    #   host: "pg-prod.example.com"
+    #   port: 5432
+    #   database: "prod_db"
+    #   readonly_user_env: "DBA_PG_PROD_RO_USER"
+    #   readonly_pass_env: "DBA_PG_PROD_RO_PASS"
+    #   admin_user_env: "DBA_PG_PROD_ADMIN_USER"
+    #   admin_pass_env: "DBA_PG_PROD_ADMIN_PASS"
+    #   timeout: 30
+
+    # --- 示例: Oracle 实例 ---
+    # - name: "oracle_prod"
+    #   type: "oracle"
+    #   host: "oracle-prod.example.com"
+    #   port: 1521
+    #   database: "ORCL"
+    #   readonly_user_env: "DBA_ORA_PROD_RO_USER"
+    #   readonly_pass_env: "DBA_ORA_PROD_RO_PASS"
+    #   admin_user_env: "DBA_ORA_PROD_ADMIN_USER"
+    #   admin_pass_env: "DBA_ORA_PROD_ADMIN_PASS"
+
+# 角色权限配置
+roles:
+  viewer:
+    description: "只读查阅 — 仅可执行L0操作"
+    max_risk_level: 0
+  editor:
+    description: "编辑者 — 可执行L0-L2操作"
+    max_risk_level: 2
+  admin:
+    description: "管理员 — 全权限L0-L4"
+    max_risk_level: 4

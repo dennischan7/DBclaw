@@ -1,0 +1,87 @@
+# DBA SafeGuard HITL (Human-In-The-Loop) Decision Matrix
+# 定义L0-L4风险等级的审批规则
+
+# 5种HITL模式:
+#   auto_approve    — 自动放行
+#   notify_approve  — 通知后放行
+#   human_confirm   — 需人工确认
+#   dual_validate   — 双Agent交叉验证
+#   force_block     — 强制阻断,需管理员
+#
+# 3种角色:
+#   viewer  — 只可查阅 (L0)
+#   editor  — 可做L0-L2操作
+#   admin   — 全权限
+
+risk_levels:
+  0:
+    label: "L0_READONLY"
+    description: "只读查询 — SELECT, SHOW, DESCRIBE, EXPLAIN"
+    action: "auto_approve"
+    require_approval: false
+    allowed_roles: ["viewer", "editor", "admin"]
+    auto_rollback: false
+    require_explain: false
+
+  1:
+    label: "L1_LOW_DML"
+    description: "低风险DML — 单行INSERT, 有WHERE的小范围UPDATE/DELETE"
+    action: "notify_approve"
+    require_approval: false
+    allowed_roles: ["editor", "admin"]
+    auto_rollback: false
+    require_explain: true
+    row_threshold: 10
+
+  2:
+    label: "L2_MEDIUM_BATCH"
+    description: "中风险批量操作 — 批量DML, CREATE INDEX, ALTER TABLE ADD"
+    action: "human_confirm"
+    require_approval: true
+    allowed_roles: ["editor", "admin"]
+    auto_rollback: true
+    require_explain: true
+    require_rollback: true
+    row_threshold: 1000
+
+  3:
+    label: "L3_HIGH_DESTRUCTIVE"
+    description: "高风险结构变更 — ALTER TABLE DROP/MODIFY, DROP INDEX, TRUNCATE"
+    action: "force_block"
+    require_approval: true
+    require_admin: true
+    allowed_roles: ["admin"]
+    auto_rollback: true
+    require_explain: true
+    require_rollback: true
+    require_backup: true
+
+  4:
+    label: "L4_CATASTROPHIC"
+    description: "灾难性操作 — DROP TABLE/DATABASE, DELETE无WHERE"
+    action: "force_block"
+    require_approval: true
+    require_admin: true
+    allowed_roles: ["admin"]
+    auto_rollback: true
+    require_explain: true
+    require_rollback: true
+    require_backup: true
+    dual_validation: true
+
+# 模式升级规则
+escalation_rules:
+  # DELETE/UPDATE无WHERE → 强制升级到L4
+  - pattern: "DELETE|UPDATE without WHERE"
+    target_level: 4
+    reason: "无WHERE条件的DELETE/UPDATE影响全表"
+
+  # 影响行数超过阈值 → 升级
+  - pattern: "rows_affected > threshold"
+    escalate_by: 1
+    reason: "预估影响行数超过当前等级阈值"
+
+  # 生产环境 → 升级
+  - pattern: "environment == production"
+    escalate_by: 1
+    reason: "生产环境操作自动提升一级"

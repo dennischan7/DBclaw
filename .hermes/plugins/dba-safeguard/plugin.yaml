@@ -1,0 +1,33 @@
+name: dba-safeguard
+version: 0.1.0
+description: >
+  DB-SafeGuard Enterprise — DBA垂直领域安全运维插件。
+  提供SQL双层校验、L0-L4风险分级、五档人机协同、四层DBA记忆、
+  绝对真理RAG知识库、自进化技能体系、全链路审计日志等企业级能力。
+author: DB-SafeGuard Team
+
+provides_tools:
+  - db_connect
+  - db_disconnect
+  - sql_validate
+  - explain_analyze
+  - metadata_read
+  - rollback_generate
+  - db_execute
+  - audit_query
+  - library_search
+  - dba_memory_search
+  - dba_memory_save
+  - dba_graph_query
+
+provides_hooks:
+  - pre_tool_call
+  - post_tool_call
+  - pre_llm_call
+  - on_session_start
+  - on_session_end
+
+requires_env:
+  - name: DBA_SAFEGUARD_ENABLED
+    description: "Set to 'true' to activate the DBA SafeGuard plugin"
+    secret: false
