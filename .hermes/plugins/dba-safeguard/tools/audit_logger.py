@@ -27,6 +27,15 @@ logger = logging.getLogger("dba_safeguard.tools.audit_logger")
 _AUDIT_DB_PATH: Optional[Path] = None
 _AUDIT_CONN: Optional[sqlite3.Connection] = None
 
+
+def set_audit_db_path(path: Path) -> None:
+    """Override the audit database path (for testing)."""
+    global _AUDIT_DB_PATH, _AUDIT_CONN
+    if _AUDIT_CONN is not None:
+        _AUDIT_CONN.close()
+        _AUDIT_CONN = None
+    _AUDIT_DB_PATH = path
+
 AUDIT_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS audit_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

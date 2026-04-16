@@ -9,11 +9,12 @@
 
 | 项目 | 值 |
 |---|---|
-| **当前阶段** | 阶段0 ✅ → 阶段1 准备开始 |
+| **当前阶段** | 阶段0 ✅ → 阶段1 ✅ → 阶段2 ✅ |
 | **Git 分支** | `dev` (开发中) |
-| **最新提交** | `b7cd95b` feat: Phase 0 - DBA SafeGuard plugin skeleton |
+| **最新提交** | Phase 2 commit (待提交) |
 | **基线提交** | `64bfc36` Initial: Hermes v0.9.0 + DBSafeGuard docs and library |
 | **测试数据库** | PostgreSQL 15 @ localhost:5437 (Docker: ent-health-postgres-kimi) |
+| **总测试数** | 134 (Phase 1: 78 + Phase 2: 56) |
 
 ---
 
@@ -103,20 +104,41 @@
 
 ---
 
-## 阶段2：核心工具层与安全沙箱 ⬜ 未开始
+## 阶段2：核心工具层与安全沙箱 ✅ 已完成
 
 > 对应开发计划"阶段2"，在阶段1校验链路跑通后继续深化。
 
 | # | 任务 | 状态 | 提交 | 备注 |
 |---|------|------|------|------|
-| 2.1 | safe_executor 完整实现 (事务/超时/重试) | ⬜ | | |
-| 2.2 | rollback_generator 基于元数据生成精确回滚 | ⬜ | | |
-| 2.3 | audit_logger CSV 批量导出 | ⬜ | | |
-| 2.4 | 连接池压测 (并发连接管理) | ⬜ | | |
-| 2.5 | MySQL 方言适配验证 | ⬜ | | |
-| 2.6 | Oracle 方言适配验证 | ⬜ | | |
-| 2.7 | SQL Server 方言适配验证 | ⬜ | | |
-| 2.8 | 工具层单元测试 ≥80% 覆盖率 | ⬜ | | |
+| 2.1 | safe_executor 完整实现 (事务/超时/快照/审计) | ✅ 已完成 | | 事务封装L1+, statement_timeout PG/MySQL, L2+ UPDATE/DELETE快照, 自动审计 |
+| 2.2 | rollback_generator 基于元数据生成精确回滚 | ✅ 已完成 | | sqlglot AST isinstance类型检测, INSERT→精确DELETE, ALTER ADD/DROP/RENAME, 元数据列定义获取 |
+| 2.3 | audit_logger CSV 批量导出 + 测试隔离 | ✅ 已完成 | | set_audit_db_path()测试隔离, export_audit_csv()批量导出 |
+| 2.4 | 连接池并发隔离测试 | ✅ 已完成 | | 5项: 并发连接/池复用/只读隔离/引擎分离/多线程 |
+| 2.5 | MySQL 方言适配验证 | ✅ 已完成 | | SELECT/INSERT/UPDATE/DROP/ALTER/DELETE无WHERE 6项离线测试 |
+| 2.6 | Oracle 方言适配验证 | ✅ 已完成 | | SELECT(ROWNUM)/INSERT/UPDATE/TRUNCATE/DROP 5项离线测试 |
+| 2.7 | SQL Server (TSQL) 方言适配验证 | ✅ 已完成 | | SELECT TOP/INSERT/UPDATE/DROP 4项离线测试 |
+| 2.8 | 工具层测试 56项 + 全回归134项 | ✅ 已完成 | | Phase2单独56项, 含跨方言回滚4项 |
+
+### Phase 2 关键实现
+
+**safe_executor.py** — 完整重写:
+1. **事务封装**: L1+操作在显式`BEGIN/COMMIT/ROLLBACK`事务中执行
+2. **超时控制**: `_set_statement_timeout()` — PG: `SET statement_timeout`, MySQL: `SET max_execution_time`
+3. **执行前快照**: L2+ UPDATE/DELETE自动用`_snapshot_affected_rows()`转换为SELECT快照受影响行
+4. **自动审计**: `_audit_execution()`每次执行前后写入audit_logger
+
+**rollback_generator.py** — 元数据驱动精确回滚:
+1. **INSERT精确回滚**: `_extract_insert_values()`从Schema.expressions提取Identifier列名+Values值→生成精确`DELETE WHERE col1=val1 AND col2=val2`
+2. **ALTER回滚**: `isinstance(action, exp.ColumnDef)`→ADD, `isinstance(action, exp.Drop)`→DROP, `isinstance(action, exp.RenameColumn)`→RENAME，不再使用字符串匹配
+3. **DROP回滚**: `_fetch_table_ddl()`通过metadata_reader获取完整DDL备份
+4. **列定义获取**: `_fetch_column_definition()`从PG/MySQL information_schema实时查询列定义（类型+默认值+NOT NULL+注释）
+5. **回滚语法验证**: `_validate_rollback_sql()`用sqlglot解析验证生成的回滚SQL
+
+### Phase 2 关键修复
+
+1. **sqlglot INSERT AST**: `Schema.expressions`是`Identifier`节点（不是`Column`），需直接遍历并用`.name`属性
+2. **sqlglot ALTER AST**: actions是类型化对象 — `ColumnDef`(ADD), `Drop`(DROP), `RenameColumn`(RENAME)，不能用`action.sql().startswith("ADD")`
+3. **ConnectionManager单例**: `safe_executor`通过`get_connection_manager()`获取模块级单例，测试fixture需配置同一单例而非创建新实例
 
 ---
 
