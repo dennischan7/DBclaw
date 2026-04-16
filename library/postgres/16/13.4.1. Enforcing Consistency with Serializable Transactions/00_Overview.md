@@ -1,0 +1,14 @@
+---
+source: PostgreSQL 16 Reference
+title: 00_Overview
+---
+
+If the Serializable transaction isolation level is used for all writes and for all reads which need a consistent view of the data, no other effort is required to ensure consistency. Software from other environments which is written to use serializable transactions to ensure consistency should "just work" in this regard in PostgreSQL.
+
+When using this technique, it will avoid creating an unnecessary burden for application programmers if the application software goes through a framework which automatically retries transactions which are rolled back with a serialization failure. It may be a good idea to set default\_transaction\_isolation to serializable. It would also be wise to take some action to ensure that no other transaction isolation level is used, either inadvertently or to subvert integrity checks, through checks of the transaction isolation level in triggers.
+
+See [Section 13.2.3](#page-127-0) for performance suggestions.
+
+## **Warning: Serializable Transactions and Data Replication**
+
+This level of integrity protection using Serializable transactions does not yet extend to hot standby mode (Section 27.4) or logical replicas. Because of that, those using hot standby or logical replication may want to use Repeatable Read and explicit locking on the primary.

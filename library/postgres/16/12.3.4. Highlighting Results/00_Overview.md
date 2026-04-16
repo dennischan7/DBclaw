@@ -1,0 +1,60 @@
+---
+source: PostgreSQL 16 Reference
+title: 00_Overview
+---
+
+To present search results it is ideal to show a part of each document and how it is related to the query. Usually, search engines show fragments of the document with marked search terms. PostgreSQL provides a function ts\_headline that implements this functionality.
+
+```
+ts_headline([ config regconfig, ] document text, query tsquery
+ [, options text ]) returns text
+```
+
+ts\_headline accepts a document along with a query, and returns an excerpt from the document in which terms from the query are highlighted. Specifically, the function will use the query to select relevant text fragments, and then highlight all words that appear in the query, even if those word positions do not match the query's restrictions. The configuration to be used to parse the document can be specified by config; if config is omitted, the default\_text\_search\_config configuration is used.
+
+If an options string is specified it must consist of a comma-separated list of one or more option=value pairs. The available options are:
+
+- MaxWords, MinWords (integers): these numbers determine the longest and shortest headlines to output. The default values are 35 and 15.
+- ShortWord (integer): words of this length or less will be dropped at the start and end of a headline, unless they are query terms. The default value of three eliminates common English articles.
+- HighlightAll (boolean): if true the whole document will be used as the headline, ignoring the preceding three parameters. The default is false.
+- MaxFragments (integer): maximum number of text fragments to display. The default value of zero selects a non-fragment-based headline generation method. A value greater than zero selects fragment-based headline generation (see below).
+- StartSel, StopSel (strings): the strings with which to delimit query words appearing in the document, to distinguish them from other excerpted words. The default values are "<b>" and "</ b>", which can be suitable for HTML output (but see the warning below).
+- FragmentDelimiter (string): When more than one fragment is displayed, the fragments will be separated by this string. The default is " ... ".
+
+## **Warning: Cross-site scripting (XSS) safety**
+
+The output from ts\_headline is not guaranteed to be safe for direct inclusion in web pages. When HighlightAll is false (the default), some simple XML tags are removed from the document, but this is not guaranteed to remove all HTML markup. Therefore, this does not provide an effective defense against attacks such as cross-site scripting (XSS) attacks, when working with untrusted input. To guard against such attacks, all HTML markup should be removed from the input document, or an HTML sanitizer should be used on the output.
+
+These option names are recognized case-insensitively. You must double-quote string values if they contain spaces or commas.
+
+In non-fragment-based headline generation, ts\_headline locates matches for the given query and chooses a single one to display, preferring matches that have more query words within the allowed headline length. In fragment-based headline generation, ts\_headline locates the query matches and splits each match into "fragments" of no more than MaxWords words each, preferring fragments with more query words, and when possible "stretching" fragments to include surrounding words. The fragment-based mode is thus more useful when the query matches span large sections of the document, or when it's desirable to display multiple matches. In either mode, if no query matches can be identified, then a single fragment of the first MinWords words in the document will be displayed.
+
+For example:
+
+```
+SELECT ts_headline('english',
+ 'The most common type of search
+is to find all documents containing given query terms
+and return them in order of their similarity to the
+query.',
+ to_tsquery('english', 'query & similarity'));
+ ts_headline
+------------------------------------------------------------
+ containing given <b>query</b> terms +
+ and return them in order of their <b>similarity</b> to the+
+ <b>query</b>.
+SELECT ts_headline('english',
+ 'Search terms may occur
+many times in a document,
+requiring ranking of the search matches to decide which
+occurrences to display in the result.',
+ to_tsquery('english', 'search & term'),
+ 'MaxFragments=10, MaxWords=7, MinWords=3, StartSel=<<,
+ StopSel=>>');
+ ts_headline
+------------------------------------------------------------
+ <<Search>> <<terms>> may occur +
+ many times ... ranking of the <<search>> matches to decide
+```
+
+ts\_headline uses the original document, not a tsvector summary, so it can be slow and should be used with care.

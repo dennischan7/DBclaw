@@ -1,0 +1,267 @@
+---
+source: MySQL 8.4 Reference
+title: 00_Overview
+---
+
+Some SQL statements relating to certain MySQL features produce errors when used with [NDB](#page-50-0) tables, as described in the following list:
+
+- **Temporary tables.** Temporary tables are not supported. Trying either to create a temporary table that uses the [NDB](#page-50-0) storage engine or to alter an existing temporary table to use [NDB](#page-50-0) fails with the error Table storage engine 'ndbcluster' does not support the create option 'TEMPORARY'.
+- **Indexes and keys in NDB tables.** Keys and indexes on NDB Cluster tables are subject to the following limitations:
+  - **Column width.** Attempting to create an index on an NDB table column whose width is greater than 3072 bytes is rejected with [ER\\_TOO\\_LONG\\_KEY](https://dev.mysql.com/doc/mysql-errors/8.4/en/server-error-reference.md#error_er_too_long_key): Specified key was too long; max key length is 3072 bytes.
+
+Attempting to create an index on an NDB table column whose width is greater than 3056 bytes succeeds with a warning. In such cases, statistical information is not generated, which means a nonoptimal execution plan may be selected. For this reason, you should consider making the index length shorter than 3056 bytes if possible.
+
+- **TEXT and BLOB columns.** You cannot create indexes on [NDB](#page-50-0) table columns that use any of the TEXT or BLOB data types.
+- **FULLTEXT indexes.** The [NDB](#page-50-0) storage engine does not support FULLTEXT indexes, which are possible for MyISAM and InnoDB tables only.
+
+However, you can create indexes on VARCHAR columns of [NDB](#page-50-0) tables.
+
+- **USING HASH keys and NULL.** Using nullable columns in unique keys and primary keys means that queries using these columns are handled as full table scans. To work around this issue, make the column NOT NULL, or re-create the index without the USING HASH option.
+- **Prefixes.** There are no prefix indexes; only entire columns can be indexed. (The size of an NDB column index is always the same as the width of the column in bytes, up to and including 3072
+
+bytes, as described earlier in this section. Also see [Section 25.2.7.6, "Unsupported or Missing](#page-78-0) [Features in NDB Cluster",](#page-78-0) for additional information.)
+
+- **BIT columns.** A BIT column cannot be a primary key, unique key, or index, nor can it be part of a composite primary key, unique key, or index.
+- **AUTO\_INCREMENT columns.** Like other MySQL storage engines, the [NDB](#page-50-0) storage engine can handle a maximum of one AUTO\_INCREMENT column per table, and this column must be indexed. However, in the case of an NDB table with no explicit primary key, an AUTO\_INCREMENT column is automatically defined and used as a "hidden" primary key. For this reason, you cannot create an NDB table having an AUTO\_INCREMENT column and no explicit primary key.
+
+The following CREATE TABLE statements do not work, as shown here:
+
+```
+# No index on AUTO_INCREMENT column; table has no primary key
+# Raises ER_WRONG_AUTO_KEY
+mysql> CREATE TABLE n (
+ -> a INT,
+ -> b INT AUTO_INCREMENT
+ -> )
+ -> ENGINE=NDB;
+ERROR 1075 (42000): Incorrect table definition; there can be only one auto
+column and it must be defined as a key 
+# Index on AUTO_INCREMENT column; table has no primary key
+# Raises NDB error 4335
+mysql> CREATE TABLE n (
+ -> a INT,
+ -> b INT AUTO_INCREMENT,
+ -> KEY k (b)
+ -> )
+ -> ENGINE=NDB;
+ERROR 1296 (HY000): Got error 4335 'Only one autoincrement column allowed per
+table. Having a table without primary key uses an autoincr' from NDBCLUSTER
+```
+
+The following statement creates a table with a primary key, an AUTO\_INCREMENT column, and an index on this column, and succeeds:
+
+```
+# Index on AUTO_INCREMENT column; table has a primary key
+mysql> CREATE TABLE n (
+ -> a INT PRIMARY KEY,
+ -> b INT AUTO_INCREMENT,
+ -> KEY k (b)
+ -> )
+ -> ENGINE=NDB;
+Query OK, 0 rows affected (0.38 sec)
+```
+
+- **Restrictions on foreign keys.** Support for foreign key constraints in NDB 8.4 is comparable to that provided by InnoDB, subject to the following restrictions:
+  - Every column referenced as a foreign key requires an explicit unique key, if it is not the table's primary key.
+  - ON UPDATE CASCADE is not supported when the reference is to the parent table's primary key.
+
+This is because an update of a primary key is implemented as a delete of the old row (containing the old primary key) plus an insert of the new row (with a new primary key). This is not visible to
+
+the NDB kernel, which views these two rows as being the same, and thus has no way of knowing that this update should be cascaded.
+
+- ON DELETE CASCADE is also not supported where the child table contains one or more columns of any of the TEXT or BLOB types. (Bug #89511, Bug #27484882)
+- SET DEFAULT is not supported. (Also not supported by InnoDB.)
+- The NO ACTION keyword is accepted but treated as RESTRICT. NO ACTION, which is a standard SQL keyword, is the default in MySQL 8.4. (Also the same as with InnoDB.)
+- In earlier versions of NDB Cluster, when creating a table with foreign key referencing an index in another table, it sometimes appeared possible to create the foreign key even if the order of the columns in the indexes did not match, due to the fact that an appropriate error was not always returned internally. A partial fix for this issue improved the error used internally to work in most cases; however, it remains possible for this situation to occur in the event that the parent index is a unique index. (Bug #18094360)
+
+For more information, see Section 15.1.20.5, "FOREIGN KEY Constraints", and Section 1.7.3.2, "FOREIGN KEY Constraints".
+
+- **NDB Cluster and geometry data types.**  Geometry data types (WKT and WKB) are supported for [NDB](#page-50-0) tables. However, spatial indexes are not supported.
+- **Character sets and binary log files.** Currently, the ndb\_apply\_status and ndb\_binlog\_index tables are created using the latin1 (ASCII) character set. Because names of binary logs are recorded in this table, binary log files named using non-Latin characters are not referenced correctly in these tables. This is a known issue, which we are working to fix. (Bug #50226)
+
+To work around this problem, use only Latin-1 characters when naming binary log files or setting any the --basedir, --log-bin, or --log-bin-index options.
+
+• **Creating NDB tables with user-defined partitioning.** Support for user-defined partitioning in NDB Cluster is restricted to [LINEAR] KEY partitioning. Using any other partitioning type with ENGINE=NDB or ENGINE=NDBCLUSTER in a CREATE TABLE statement results in an error.
+
+It is possible to override this restriction, but doing so is not supported for use in production settings. For details, see User-defined partitioning and the NDB storage engine (NDB Cluster).
+
+**Default partitioning scheme.** All NDB Cluster tables are by default partitioned by KEY using the table's primary key as the partitioning key. If no primary key is explicitly set for the table, the "hidden" primary key automatically created by the [NDB](#page-50-0) storage engine is used instead. For additional discussion of these and related issues, see Section 26.2.5, "KEY Partitioning".
+
+CREATE TABLE and ALTER TABLE statements that would cause a user-partitioned [NDBCLUSTER](#page-50-0) table not to meet either or both of the following two requirements are not permitted, and fail with an error:
+
+- 1. The table must have an explicit primary key.
+- 2. All columns listed in the table's partitioning expression must be part of the primary key.
+
+**Exception.** If a user-partitioned [NDBCLUSTER](#page-50-0) table is created using an empty column-list (that is, using PARTITION BY [LINEAR] KEY()), then no explicit primary key is required.
+
+**Maximum number of partitions for NDBCLUSTER tables.** The maximum number of partitions that can defined for a [NDBCLUSTER](#page-50-0) table when employing user-defined partitioning is 8 per node group. (See [Section 25.2.2, "NDB Cluster Nodes, Node Groups, Fragment Replicas, and Partitions",](#page-58-0) for more information about NDB Cluster node groups.
+
+**DROP PARTITION not supported.** It is not possible to drop partitions from [NDB](#page-50-0) tables using ALTER TABLE ... DROP PARTITION. The other partitioning extensions to ALTER TABLE—ADD PARTITION, REORGANIZE PARTITION, and COALESCE PARTITION—are supported for NDB tables, but use copying and so are not optimized. See Section 26.3.1, "Management of RANGE and LIST Partitions" and Section 15.1.9, "ALTER TABLE Statement".
+
+**Partition selection.** Partition selection is not supported for NDB tables. See Section 26.5, "Partition Selection", for more information.
+
+• **JSON data type.** The MySQL JSON data type is supported for NDB tables in the mysqld supplied with NDB 8.4.
+
+An NDB table can have a maximum of 3 JSON columns.
+
+The NDB API has no special provision for working with JSON data, which it views simply as BLOB data. Handling data as JSON must be performed by the application.
+
+• **DEFAULT value expressions.** Explicit default value expressions (as implemented in MySQL 8.0.34 and later) for NDB table column definitions are not supported. This means that, for example, the following CREATE TABLE statement is rejected with an error:
+
+```
+mysql> CREATE TABLE t (
+ -> id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+ -> cf FLOAT DEFAULT (RAND() * 10)
+ -> ) ENGINE=NDBCLUSTER;
+ERROR 3774 (HY000): 'Specified storage engine' is not supported for default value expressions.
+```
+
+NDB Cluster does support literal default column values, as shown here:
+
+```
+mysql> CREATE TABLE t3 (
+ -> id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+ -> ci INT DEFAULT 0,
+ -> cv VARCHAR(20) DEFAULT ''
+ -> ) ENGINE=NDBCLUSTER;
+Query OK, 0 rows affected (0.17 sec)
+```
+
+For more information, see Section 13.6, "Data Type Default Values".
+
+# <span id="page-73-0"></span>**25.2.7.2 Limits and Differences of NDB Cluster from Standard MySQL Limits**
+
+In this section, we list limits found in NDB Cluster that either differ from limits found in, or that are not found in, standard MySQL.
+
+**Memory usage and recovery.** Memory consumed when data is inserted into an [NDB](#page-50-0) table is not automatically recovered when deleted, as it is with other storage engines. Instead, the following rules hold true:
+
+• A DELETE statement on an [NDB](#page-50-0) table makes the memory formerly used by the deleted rows available for re-use by inserts on the same table only. However, this memory can be made available for general re-use by performing OPTIMIZE TABLE.
+
+A rolling restart of the cluster also frees any memory used by deleted rows. See Section 25.6.5, "Performing a Rolling Restart of an NDB Cluster".
+
+• A DROP TABLE or TRUNCATE TABLE operation on an [NDB](#page-50-0) table frees the memory that was used by this table for re-use by any [NDB](#page-50-0) table, either by the same table or by another [NDB](#page-50-0) table.
+
+![](_page_73_Picture_17.jpeg)
+
+#### **Note**
+
+Recall that TRUNCATE TABLE drops and re-creates the table. See Section 15.1.37, "TRUNCATE TABLE Statement".
+
+• **Limits imposed by the cluster's configuration.** 
+
+A number of hard limits exist which are configurable, but available main memory in the cluster sets limits. See the complete list of configuration parameters in [Section 25.4.3, "NDB Cluster](#page-131-0) [Configuration Files".](#page-131-0) Most configuration parameters can be upgraded online. These hard limits include:
+
+• Database memory size and index memory size ([DataMemory](#page-156-0) and [IndexMemory](#page-157-0), respectively).
+
+[DataMemory](#page-156-0) is allocated as 32KB pages. As each [DataMemory](#page-156-0) page is used, it is assigned to a specific table; once allocated, this memory cannot be freed except by dropping the table.
+
+See [Section 25.4.3.6, "Defining NDB Cluster Data Nodes",](#page-149-0) for more information.
+
+• The maximum number of operations that can be performed per transaction is set using the configuration parameters [MaxNoOfConcurrentOperations](#page-161-0) and [MaxNoOfLocalOperations](#page-162-0).
+
+![](_page_74_Picture_6.jpeg)
+
+#### **Note**
+
+Bulk loading, TRUNCATE TABLE, and ALTER TABLE are handled as special cases by running multiple transactions, and so are not subject to this limitation.
+
+- Different limits related to tables and indexes. For example, the maximum number of ordered indexes in the cluster is determined by [MaxNoOfOrderedIndexes](#page-181-0), and the maximum number of ordered indexes per table is 16.
+- **Node and data object maximums.** The following limits apply to numbers of cluster nodes and metadata objects:
+  - The maximum number of data nodes is 144. (In NDB 7.6 and earlier, this was 48.)
+
+A data node must have a node ID in the range of 1 to 144, inclusive.
+
+Management and API nodes may use node IDs in the range 1 to 255, inclusive.
+
+- The total maximum number of nodes in an NDB Cluster is 255. This number includes all SQL nodes (MySQL Servers), API nodes (applications accessing the cluster other than MySQL servers), data nodes, and management servers.
+- The maximum number of metadata objects in current versions of NDB Cluster is 20320. This limit is hard-coded.
+
+# <span id="page-74-0"></span>**25.2.7.3 Limits Relating to Transaction Handling in NDB Cluster**
+
+A number of limitations exist in NDB Cluster with regard to the handling of transactions. These include the following:
+
+• **Transaction isolation level.** The [NDBCLUSTER](#page-50-0) storage engine supports only the READ COMMITTED transaction isolation level. (InnoDB, for example, supports READ COMMITTED, READ UNCOMMITTED, REPEATABLE READ, and SERIALIZABLE.) You should keep in mind that NDB implements READ COMMITTED on a per-row basis; when a read request arrives at the data node storing the row, what is returned is the last committed version of the row at that time.
+
+Uncommitted data is never returned, but when a transaction modifying a number of rows commits concurrently with a transaction reading the same rows, the transaction performing the read can observe "before" values, "after" values, or both, for different rows among these, due to the fact that a given row read request can be processed either before or after the commit of the other transaction.
+
+To ensure that a given transaction reads only before or after values, you can impose row locks using SELECT ... LOCK IN SHARE MODE. In such cases, the lock is held until the owning transaction is committed. Using row locks can also cause the following issues:
+
+- Increased frequency of lock wait timeout errors, and reduced concurrency
+- Increased transaction processing overhead due to reads requiring a commit phase
+- Possibility of exhausting the available number of concurrent locks, which is limited by [MaxNoOfConcurrentOperations](#page-161-0)
+
+NDB uses READ COMMITTED for all reads unless a modifier such as LOCK IN SHARE MODE or FOR UPDATE is used. LOCK IN SHARE MODE causes shared row locks to be used; FOR UPDATE causes exclusive row locks to be used. Unique key reads have their locks upgraded automatically by NDB to ensure a self-consistent read; BLOB reads also employ extra locking for consistency.
+
+See Section 25.6.8.4, "NDB Cluster Backup Troubleshooting", for information on how NDB Cluster's implementation of transaction isolation level can affect backup and restoration of NDB databases.
+
+- **Transactions and BLOB or TEXT columns.** [NDBCLUSTER](#page-50-0) stores only part of a column value that uses any of MySQL's BLOB or TEXT data types in the table visible to MySQL; the remainder of the BLOB or TEXT is stored in a separate internal table that is not accessible to MySQL. This gives rise to two related issues of which you should be aware whenever executing SELECT statements on tables that contain columns of these types:
+  - 1. For any SELECT from an NDB Cluster table: If the SELECT includes a BLOB or TEXT column, the READ COMMITTED transaction isolation level is converted to a read with read lock. This is done to guarantee consistency.
+  - 2. For any SELECT which uses a unique key lookup to retrieve any columns that use any of the BLOB or TEXT data types and that is executed within a transaction, a shared read lock is held on the table for the duration of the transaction—that is, until the transaction is either committed or aborted.
+
+This issue does not occur for queries that use index or table scans, even against [NDB](#page-50-0) tables having BLOB or TEXT columns.
+
+For example, consider the table t defined by the following CREATE TABLE statement:
+
+```
+CREATE TABLE t (
+ a INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+ b INT NOT NULL,
+ c INT NOT NULL,
+ d TEXT,
+ INDEX i(b),
+ UNIQUE KEY u(c)
+) ENGINE = NDB,
+```
+
+The following query on t causes a shared read lock, because it uses a unique key lookup:
+
+```
+SELECT * FROM t WHERE c = 1;
+```
+
+However, none of the four queries shown here causes a shared read lock:
+
+```
+SELECT * FROM t WHERE b = 1;
+SELECT * FROM t WHERE d = '1';
+SELECT * FROM t;
+```
+
+```
+SELECT b,c WHERE a = 1;
+```
+
+This is because, of these four queries, the first uses an index scan, the second and third use table scans, and the fourth, while using a primary key lookup, does not retrieve the value of any BLOB or TEXT columns.
+
+You can help minimize issues with shared read locks by avoiding queries that use unique key lookups that retrieve BLOB or TEXT columns, or, in cases where such queries are not avoidable, by committing transactions as soon as possible afterward.
+
+• **Unique key lookups and transaction isolation.** Unique indexes are implemented in NDB using a hidden index table which is maintained internally. When a user-created NDB table is accessed using a unique index, the hidden index table is first read to find the primary key that is then used to read the user-created table. To avoid modification of the index during this double-read operation, the row found in the hidden index table is locked. When a row referenced by a unique index in the usercreated NDB table is updated, the hidden index table is subject to an exclusive lock by the transaction in which the update is performed. This means that any read operation on the same (user-created) NDB table must wait for the update to complete. This is true even when the transaction level of the read operation is READ COMMITTED.
+
+One workaround which can be used to bypass potentially blocking reads is to force the SQL node to ignore the unique index when performing the read. This can be done by using the IGNORE INDEX index hint as part of the SELECT statement reading the table (see Section 10.9.4, "Index Hints"). Because the MySQL server creates a shadowing ordered index for every unique index created in NDB, this lets the ordered index be read instead, and avoids unique index access locking. The resulting read is as consistent as a committed read by primary key, returning the last committed value at the time the row is read.
+
+Reading via an ordered index makes less efficient use of resources in the cluster, and may have higher latency.
+
+It is also possible to avoid using the unique index for access by querying for ranges rather than for unique values.
+
+• **Rollbacks.** There are no partial transactions, and no partial rollbacks of transactions. A duplicate key or similar error causes the entire transaction to be rolled back.
+
+This behavior differs from that of other transactional storage engines such as InnoDB that may roll back individual statements.
+
+#### • **Transactions and memory usage.**
+
+As noted elsewhere in this chapter, NDB Cluster does not handle large transactions well; it is better to perform a number of small transactions with a few operations each than to attempt a single large transaction containing a great many operations. Among other considerations, large transactions require very large amounts of memory. Because of this, the transactional behavior of a number of MySQL statements is affected as described in the following list:
+
+- TRUNCATE TABLE is not transactional when used on [NDB](#page-50-0) tables. If a TRUNCATE TABLE fails to empty the table, then it must be re-run until it is successful.
+- DELETE FROM (even with no WHERE clause) is transactional. For tables containing a great many rows, you may find that performance is improved by using several DELETE FROM ... LIMIT ... statements to "chunk" the delete operation. If your objective is to empty the table, then you may wish to use TRUNCATE TABLE instead.
+- **LOAD DATA statements.** LOAD DATA is not transactional when used on [NDB](#page-50-0) tables.
+
+![](_page_76_Picture_15.jpeg)
+
+#### **Important**
+
+When executing a LOAD DATA statement, the [NDB](#page-50-0) engine performs commits at irregular intervals that enable better utilization of the
+
+communication network. It is not possible to know ahead of time when such commits take place.
+
+- **ALTER TABLE and transactions.** When copying an [NDB](#page-50-0) table as part of an ALTER TABLE, the creation of the copy is nontransactional. (In any case, this operation is rolled back when the copy is deleted.)
+- **Transactions and the COUNT() function.** When using NDB Cluster Replication, it is not possible to guarantee the transactional consistency of the COUNT() function on the replica. In other words, when performing on the source a series of statements (INSERT, DELETE, or both) that changes the number of rows in a table within a single transaction, executing SELECT COUNT(\*) FROM table queries on the replica may yield intermediate results. This is due to the fact that SELECT COUNT(...) may perform dirty reads, and is not a bug in the [NDB](#page-50-0) storage engine. (See Bug #31321 for more information.)

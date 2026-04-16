@@ -1,0 +1,193 @@
+---
+source: MySQL 8.4 Reference
+title: 00_Overview
+---
+
+The listings in this section provide information about parameters used in the [ndbd] or [ndbd default] sections of a config.ini file for configuring NDB Cluster data nodes. For detailed descriptions and other additional information about each of these parameters, see [Section 25.4.3.6,](#page-149-0) ["Defining NDB Cluster Data Nodes"](#page-149-0).
+
+These parameters also apply to ndbmtd, the multithreaded version of ndbd. A separate listing of parameters specific to ndbmtd follows.
+
+- ApiFailureHandlingTimeout: Maximum time for API node failure handling before escalating. 0 means no time limit; minimum usable value is 10.
+- Arbitration: How arbitration should be performed to avoid split-brain issues in event of node failure.
+- ArbitrationTimeout: Maximum time (milliseconds) database partition waits for arbitration signal.
+- BackupDataBufferSize: Default size of databuffer for backup (in bytes).
+
+- [BackupDataDir](#page-155-0): Path to where to store backups. Note that string '/BACKUP' is always appended to this setting, so that \*effective\* default is FileSystemPath/BACKUP.
+- BackupDiskWriteSpeedPct: Sets percentage of data node's allocated maximum write speed (MaxDiskWriteSpeed) to reserve for LCPs when starting backup.
+- BackupLogBufferSize: Default size of log buffer for backup (in bytes).
+- BackupMaxWriteSize: Maximum size of file system writes made by backup (in bytes).
+- BackupMemory: Total memory allocated for backups per node (in bytes).
+- BackupReportFrequency: Frequency of backup status reports during backup in seconds.
+- BackupWriteSize: Default size of file system writes made by backup (in bytes).
+- [BatchSizePerLocalScan](#page-168-0): Used to calculate number of lock records for scan with hold lock.
+- BuildIndexThreads: Number of threads to use for building ordered indexes during system or node restart. Also applies when running ndb\_restore --rebuild-indexes. Setting this parameter to 0 disables multithreaded building of ordered indexes.
+- CompressedBackup: Use zlib to compress backups as they are written.
+- [CompressedLCP](#page-184-0): Write compressed LCPs using zlib.
+- [ConnectCheckIntervalDelay](#page-195-0): Time between data node connectivity check stages. Data node is considered suspect after 1 interval and dead after 2 intervals with no response.
+- [CrashOnCorruptedTuple](#page-184-1): When enabled, forces node to shut down whenever it detects corrupted tuple.
+- [DataDir](#page-154-0): Data directory for this node.
+- [DataMemory](#page-156-0): Number of bytes on each data node allocated for storing data; subject to available system RAM and size of IndexMemory.
+- [DefaultHashMapSize](#page-172-0): Set size (in buckets) to use for table hash maps. Three values are supported: 0, 240, and 3840.
+- DictTrace: Enable DBDICT debugging; for NDB development.
+- DiskDataUsingSameDisk: Set to false if Disk Data tablespaces are located on separate physical disks.
+- DiskIOThreadPool: Number of unbound threads for file access, applies to disk data only.
+- [Diskless](#page-184-2): Run without using disk.
+- DiskPageBufferEntries: Memory to allocate in DiskPageBufferMemory; very large disk transactions may require increasing this value.
+- DiskPageBufferMemory: Number of bytes on each data node allocated for disk page buffer cache.
+- DiskSyncSize: Amount of data written to file before synch is forced.
+- [EnablePartialLcp](#page-174-0): Enable partial LCP (true); if this is disabled (false), all LCPs write full checkpoints.
+- [EnableRedoControl](#page-179-0): Enable adaptive checkpointing speed for controlling redo log usage.
+- [EncryptedFileSystem](#page-185-0): Encrypt local checkpoint and tablespace files..
+
+- EventLogBufferSize: Size of circular buffer for NDB log events within data nodes.
+- [ExecuteOnComputer](#page-150-0): String referencing earlier defined COMPUTER.
+- ExtraSendBufferMemory: Memory to use for send buffers in addition to any allocated by TotalSendBufferMemory or SendBufferMemory. Default (0) allows up to 16MB.
+- [FileSystemPath](#page-154-1): Path to directory where data node stores its data (directory must exist).
+- FileSystemPathDataFiles: Path to directory where data node stores its Disk Data files. Default value is FilesystemPathDD, if set; otherwise, FilesystemPath is used if it is set; otherwise, value of DataDir is used.
+- FileSystemPathDD: Path to directory where data node stores its Disk Data and undo files. Default value is FileSystemPath, if set; otherwise, value of DataDir is used.
+- FileSystemPathUndoFiles: Path to directory where data node stores its undo files for Disk Data. Default value is FilesystemPathDD, if set; otherwise, FilesystemPath is used if it is set; otherwise, value of DataDir is used.
+- [FragmentLogFileSize](#page-173-0): Size of each redo log file.
+- [HeartbeatIntervalDbApi](#page-193-0): Time between API node-data node heartbeats. (API connection closed after 3 missed heartbeats).
+- [HeartbeatIntervalDbDb](#page-192-0): Time between data node-to-data node heartbeats; data node considered dead after 3 missed heartbeats.
+- [HeartbeatOrder](#page-193-1): Sets order in which data nodes check each others' heartbeats for determining whether given node is still active and connected to cluster. Must be zero for all data nodes or distinct nonzero values for all data nodes; see documentation for further guidance.
+- [HostName](#page-151-0): Host name or IP address for this data node.
+- [IndexMemory](#page-157-0): Number of bytes on each data node allocated for storing indexes; subject to available system RAM and size of DataMemory.
+- IndexStatAutoCreate: Enable/disable automatic statistics collection when indexes are created.
+- IndexStatAutoUpdate: Monitor indexes for changes and trigger automatic statistics updates.
+- IndexStatSaveScale: Scaling factor used in determining size of stored index statistics.
+- IndexStatSaveSize: Maximum size in bytes for saved statistics per index.
+- IndexStatTriggerPct: Threshold percent change in DML operations for index statistics updates. Value is scaled down by IndexStatTriggerScale.
+- IndexStatTriggerScale: Scale down IndexStatTriggerPct by this amount, multiplied by base 2 logarithm of index size, for large index. Set to 0 to disable scaling.
+- IndexStatUpdateDelay: Minimum delay between automatic index statistics updates for given index. 0 means no delay.
+- [InitFragmentLogFiles](#page-173-1): Initialize fragment log files, using sparse or full format.
+- InitialLogFileGroup: Describes log file group that is created during initial start. See documentation for format.
+- [InitialNoOfOpenFiles](#page-173-2): Initial number of files open per data node. (One thread is created per file).
+- InitialTablespace: Describes tablespace that is created during initial start. See documentation for format.
+
+- [InsertRecoveryWork](#page-178-0): Percentage of RecoveryWork used for inserted rows; has no effect unless partial local checkpoints are in use.
+- KeepAliveSendInterval: Time between keep-alive signals on links between data nodes, in milliseconds. Set to 0 to disable.
+- [LateAlloc](#page-186-0): Allocate memory after connection to management server has been established.
+- [LcpScanProgressTimeout](#page-175-0): Maximum time that local checkpoint fragment scan can be stalled before node is shut down to ensure systemwide LCP progress. Use 0 to disable.
+- [LocationDomainId](#page-153-1): Assign this data node to specific availability domain or zone. 0 (default) leaves this unset.
+- LockExecuteThreadToCPU: Comma-delimited list of CPU IDs.
+- LockMaintThreadsToCPU: CPU ID indicating which CPU runs maintenance threads.
+- [LockPagesInMainMemory](#page-186-1): 0=disable locking, 1=lock after memory allocation, 2=lock before memory allocation.
+- LogLevelCheckpoint: Log level of local and global checkpoint information printed to stdout.
+- LogLevelCongestion: Level of congestion information printed to stdout.
+- LogLevelConnection: Level of node connect/disconnect information printed to stdout.
+- LogLevelError: Transporter, heartbeat errors printed to stdout.
+- LogLevelInfo: Heartbeat and log information printed to stdout.
+- LogLevelNodeRestart: Level of node restart and node failure information printed to stdout.
+- LogLevelShutdown: Level of node shutdown information printed to stdout.
+- LogLevelStartup: Level of node startup information printed to stdout.
+- LogLevelStatistic: Level of transaction, operation, and transporter information printed to stdout.
+- [LongMessageBuffer](#page-168-1): Number of bytes allocated on each data node for internal long messages.
+- [MaxAllocate](#page-171-0): No longer used; has no effect.
+- [MaxBufferedEpochs](#page-197-0): Allowed numbered of epochs that subscribing node can lag behind (unprocessed epochs). Exceeding causes lagging subscribers to be disconnected.
+- [MaxBufferedEpochBytes](#page-198-0): Total number of bytes allocated for buffering epochs.
+- MaxDiskDataLatency: Maximum allowed mean latency of disk access (ms) before starting to abort transactions.
+- MaxDiskWriteSpeed: Maximum number of bytes per second that can be written by LCP and backup when no restarts are ongoing.
+- MaxDiskWriteSpeedOtherNodeRestart: Maximum number of bytes per second that can be written by LCP and backup when another node is restarting.
+- MaxDiskWriteSpeedOwnRestart: Maximum number of bytes per second that can be written by LCP and backup when this node is restarting.
+- [MaxFKBuildBatchSize](#page-169-0): Maximum scan batch size to use for building foreign keys. Increasing this value may speed up builds of foreign keys but impacts ongoing traffic as well.
+- [MaxDMLOperationsPerTransaction](#page-163-0): Limit size of transaction; aborts transaction if it requires more than this many DML operations.
+
+- [MaxLCPStartDelay](#page-176-0): Time in seconds that LCP polls for checkpoint mutex (to allow other data nodes to complete metadata synchronization), before putting itself in lock queue for parallel recovery of table data.
+- [MaxNoOfAttributes](#page-179-1): Suggests total number of attributes stored in database (sum over all tables).
+- [MaxNoOfConcurrentIndexOperations](#page-163-1): Total number of index operations that can execute simultaneously on one data node.
+- [MaxNoOfConcurrentOperations](#page-161-0): Maximum number of operation records in transaction coordinator.
+- [MaxNoOfConcurrentScans](#page-169-1): Maximum number of scans executing concurrently on data node.
+- [MaxNoOfConcurrentSubOperations](#page-183-0): Maximum number of concurrent subscriber operations.
+- [MaxNoOfConcurrentTransactions](#page-160-0): Maximum number of transactions executing concurrently on this data node, total number of transactions that can be executed concurrently is this value times number of data nodes in cluster.
+- [MaxNoOfFiredTriggers](#page-164-0): Total number of triggers that can fire simultaneously on one data node.
+- [MaxNoOfLocalOperations](#page-162-0): Maximum number of operation records defined on this data node.
+- [MaxNoOfLocalScans](#page-170-0): Maximum number of fragment scans in parallel on this data node.
+- [MaxNoOfOpenFiles](#page-175-1): Maximum number of files open per data node.(One thread is created per file).
+- [MaxNoOfOrderedIndexes](#page-181-0): Total number of ordered indexes that can be defined in system.
+- [MaxNoOfSavedMessages](#page-175-2): Maximum number of error messages to write in error log and maximum number of trace files to retain.
+- [MaxNoOfSubscribers](#page-183-1): Maximum number of subscribers.
+- [MaxNoOfSubscriptions](#page-182-0): Maximum number of subscriptions (default 0 = MaxNoOfTables).
+- [MaxNoOfTables](#page-180-0): Suggests total number of NDB tables stored in database.
+- [MaxNoOfTriggers](#page-182-1): Total number of triggers that can be defined in system.
+- [MaxNoOfUniqueHashIndexes](#page-181-1): Total number of unique hash indexes that can be defined in system.
+- [MaxParallelCopyInstances](#page-170-1): Number of parallel copies during node restarts. Default is 0, which uses number of LDMs on both nodes, to maximum of 16.
+- [MaxParallelScansPerFragment](#page-170-2): Maximum number of parallel scans per fragment. Once this limit is reached, scans are serialized.
+- [MaxReorgBuildBatchSize](#page-171-1): Maximum scan batch size to use for reorganization of table partitions. Increasing this value may speed up table partition reorganization but impacts ongoing traffic as well.
+- MaxStartFailRetries: Maximum retries when data node fails on startup, requires StopOnError = 0. Setting to 0 causes start attempts to continue indefinitely.
+- [MaxUIBuildBatchSize](#page-171-2): Maximum scan batch size to use for building unique keys. Increasing this value may speed up builds of unique keys but impacts ongoing traffic as well.
+- MemReportFrequency: Frequency of memory reports in seconds; 0 = report only when exceeding percentage limits.
+- MinDiskWriteSpeed: Minimum number of bytes per second that can be written by LCP and backup.
+
+- [MinFreePct](#page-159-0): Percentage of memory resources to keep in reserve for restarts.
+- [NodeGroup](#page-152-0): Node group to which data node belongs; used only during initial start of cluster.
+- [NodeGroupTransporters](#page-172-1): Number of transporters to use between nodes in same node group.
+- [NodeId](#page-150-1): Number uniquely identifying data node among all nodes in cluster.
+- [NoOfFragmentLogFiles](#page-176-1): Number of 16 MB redo log files in each of 4 file sets belonging to data node.
+- [NoOfReplicas](#page-153-0): Number of copies of all data in database.
+- Numa: (Linux only; requires libnuma) Controls NUMA support. Setting to 0 permits system to determine use of interleaving by data node process; 1 means that it is determined by data node.
+- [ODirect](#page-187-0): Use O\_DIRECT file reads and writes when possible.
+- [ODirectSyncFlag](#page-187-1): O\_DIRECT writes are treated as synchronized writes; ignored when ODirect is not enabled, InitFragmentLogFiles is set to SPARSE, or both.
+- RealtimeScheduler: When true, data node threads are scheduled as real-time threads. Default is false.
+- [RecoveryWork](#page-177-0): Percentage of storage overhead for LCP files: greater value means less work in normal operations, more work during recovery.
+- RedoBuffer: Number of bytes on each data node allocated for writing redo logs.
+- RedoOverCommitCounter: When RedoOverCommitLimit has been exceeded this many times, transactions are aborted, and operations are handled as specified by DefaultOperationRedoProblemAction.
+- RedoOverCommitLimit: Each time that flushing current redo buffer takes longer than this many seconds, number of times that this has happened is compared to RedoOverCommitCounter.
+- RequireEncryptedBackup: Whether backups must be encrypted (1 = encryption required, otherwise 0).
+- [RequireCertificate](#page-188-1): Node is required to find key and certificate in TLS search path.
+- [RequireTls](#page-188-0): Require TLS-authenticated secure connections.
+- [ReservedConcurrentIndexOperations](#page-165-0): Number of simultaneous index operations having dedicated resources on one data node.
+- [ReservedConcurrentOperations](#page-165-1): Number of simultaneous operations having dedicated resources in transaction coordinators on one data node.
+- [ReservedConcurrentScans](#page-166-0): Number of simultaneous scans having dedicated resources on one data node.
+- [ReservedConcurrentTransactions](#page-166-1): Number of simultaneous transactions having dedicated resources on one data node.
+- [ReservedFiredTriggers](#page-166-2): Number of triggers having dedicated resources on one data node.
+- [ReservedLocalScans](#page-166-3): Number of simultaneous fragment scans having dedicated resources on one data node.
+- [ReservedTransactionBufferMemory](#page-167-0): Dynamic buffer space (in bytes) for key and attribute data allocated to each data node.
+
+- [RestartOnErrorInsert](#page-188-2): Control type of restart caused by inserting error (when StopOnError is enabled).
+- RestartSubscriberConnectTimeout: Amount of time for data node to wait for subscribing API nodes to connect. Set to 0 to disable timeout, which is always resolved to nearest full second.
+- SchedulerExecutionTimer: Number of microseconds to execute in scheduler before sending.
+- SchedulerResponsiveness: Set NDB scheduler response optimization 0-10; higher values provide better response time but lower throughput.
+- SchedulerSpinTimer: Number of microseconds to execute in scheduler before sleeping.
+- [ServerPort](#page-151-1): Port used to set up transporter for incoming connections from API nodes.
+- SharedGlobalMemory: Total number of bytes on each data node allocated for any use.
+- SpinMethod: Determines spin method used by data node; see documentation for details.
+- StartFailRetryDelay: Delay in seconds after start failure prior to retry; requires StopOnError = 0.
+- [StartFailureTimeout](#page-191-0): Milliseconds to wait before terminating. (0=Wait forever).
+- [StartNoNodeGroupTimeout](#page-192-1): Time to wait for nodes without nodegroup before trying to start (0=forever).
+- [StartPartialTimeout](#page-190-0): Milliseconds to wait before trying to start without all nodes. (0=Wait forever).
+- [StartPartitionedTimeout](#page-191-1): Milliseconds to wait before trying to start partitioned. (0=Wait forever).
+- StartupStatusReportFrequency: Frequency of status reports during startup.
+- [StopOnError](#page-189-0): When set to 0, data node automatically restarts and recovers following node failures.
+- [StringMemory](#page-158-0): Default size of string memory (0 to 100 = % of maximum, 101+ = actual bytes).
+- [TcpBind\\_INADDR\\_ANY](#page-152-1): Bind IP\_ADDR\_ANY so that connections can be made from anywhere (for autogenerated connections).
+- [TimeBetweenEpochs](#page-197-1): Time between epochs (synchronization used for replication).
+- [TimeBetweenEpochsTimeout](#page-197-2): Timeout for time between epochs. Exceeding causes node shutdown.
+- [TimeBetweenGlobalCheckpoints](#page-196-0): Time between group commits of transactions to disk.
+- [TimeBetweenGlobalCheckpointsTimeout](#page-196-1): Minimum timeout for group commit of transactions to disk.
+- [TimeBetweenInactiveTransactionAbortCheck](#page-198-1): Time between checks for inactive transactions.
+- [TimeBetweenLocalCheckpoints](#page-195-1): Time between taking snapshots of database (expressed in base-2 logarithm of bytes).
+- [TimeBetweenWatchDogCheck](#page-189-1): Time between execution checks inside data node.
+- [TimeBetweenWatchDogCheckInitial](#page-190-1): Time between execution checks inside data node (early start phases when memory is allocated).
+- TotalSendBufferMemory: Total memory to use for all transporter send buffers..
+
+- [TransactionBufferMemory](#page-164-1): Dynamic buffer space (in bytes) for key and attribute data allocated for each data node.
+- [TransactionDeadlockDetectionTimeout](#page-199-0): Time transaction can spend executing within data node. This is time that transaction coordinator waits for each data node participating in transaction to execute request. If data node takes more than this amount of time, transaction is aborted.
+- [TransactionInactiveTimeout](#page-199-1): Milliseconds that application waits before executing another part of transaction. This is time transaction coordinator waits for application to execute or send another part (query, statement) of transaction. If application takes too much time, then transaction is aborted. Timeout = 0 means that application never times out.
+- [TransactionMemory](#page-167-1): Memory allocated for transactions on each data node.
+- TwoPassInitialNodeRestartCopy: Copy data in 2 passes during initial node restart, which enables multithreaded building of ordered indexes for such restarts.
+- UndoDataBuffer: Unused; has no effect.
+- UndoIndexBuffer: Unused; has no effect.
+- [UseShm](#page-189-2): Use shared memory connections between this data node and API node also running on this host.
+- WatchDogImmediateKill: When true, threads are immediately killed whenever watchdog issues occur; used for testing and debugging.
+
+The following parameters are specific to ndbmtd:
+
+- AutomaticThreadConfig: Use automatic thread configuration; overrides any settings for ThreadConfig and MaxNoOfExecutionThreads, and disables ClassicFragmentation.
+- ClassicFragmentation: When true, use traditional table fragmentation; set false to enable flexible distribution of fragments among LDMs. Disabled by AutomaticThreadConfig.
+- EnableMultithreadedBackup: Enable multi-threaded backup.
+- MaxNoOfExecutionThreads: For ndbmtd only, specify maximum number of execution threads.
+- MaxSendDelay: Maximum number of microseconds to delay sending by ndbmtd.
+- NoOfFragmentLogParts: Number of redo log file groups belonging to this data node.
+- NumCPUs: Specify number of CPUs to use with AutomaticThreadConfig.
+- PartitionsPerNode: Determines the number of table partitions created on each data node; not used if ClassicFragmentation is enabled.
+- ThreadConfig: Used for configuration of multithreaded data nodes (ndbmtd). Default is empty string; see documentation for syntax and other information.

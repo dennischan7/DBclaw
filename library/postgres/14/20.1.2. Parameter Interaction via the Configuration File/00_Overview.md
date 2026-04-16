@@ -1,0 +1,27 @@
+---
+source: PostgreSQL 14 Reference
+title: 00_Overview
+---
+
+The most fundamental way to set these parameters is to edit the file postgresql.conf, which is normally kept in the data directory. A default copy is installed when the database cluster directory is initialized. An example of what this file might look like is:
+
+# This is a comment
+
+```
+log_connections = yes
+log_destination = 'syslog'
+search_path = '"$user", public'
+shared_buffers = 128MB
+```
+
+One parameter is specified per line. The equal sign between name and value is optional. Whitespace is insignificant (except within a quoted parameter value) and blank lines are ignored. Hash marks (#) designate the remainder of the line as a comment. Parameter values that are not simple identifiers or numbers must be single-quoted. To embed a single quote in a parameter value, write either two quotes (preferred) or backslash-quote. If the file contains multiple entries for the same parameter, all but the last one are ignored.
+
+Parameters set in this way provide default values for the cluster. The settings seen by active sessions will be these values unless they are overridden. The following sections describe ways in which the administrator or user can override these defaults.
+
+ The configuration file is reread whenever the main server process receives a SIGHUP signal; this signal is most easily sent by running pg\_ctl reload from the command line or by calling the SQL function pg\_reload\_conf(). The main server process also propagates this signal to all currently running server processes, so that existing sessions also adopt the new values (this will happen after they complete any currently-executing client command). Alternatively, you can send the signal to a single server process directly. Some parameters can only be set at server start; any changes to their entries in the configuration file will be ignored until the server is restarted. Invalid parameter settings in the configuration file are likewise ignored (but logged) during SIGHUP processing.
+
+In addition to postgresql.conf, a PostgreSQL data directory contains a file postgresql.auto.conf, which has the same format as postgresql.conf but is intended to be edited automatically, not manually. This file holds settings provided through the ALTER SYSTEM command. This file is read whenever postgresql.conf is, and its settings take effect in the same way. Settings in postgresql.auto.conf override those in postgresql.conf.
+
+External tools may also modify postgresql.auto.conf. It is not recommended to do this while the server is running, since a concurrent ALTER SYSTEM command could overwrite such changes. Such tools might simply append new settings to the end, or they might choose to remove duplicate settings and/or comments (as ALTER SYSTEM will).
+
+The system view pg\_file\_settings can be helpful for pre-testing changes to the configuration files, or for diagnosing problems if a SIGHUP signal did not have the desired effects.

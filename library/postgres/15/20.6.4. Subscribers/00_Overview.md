@@ -1,0 +1,30 @@
+---
+source: PostgreSQL 15 Reference
+title: 00_Overview
+---
+
+These settings control the behavior of a logical replication subscriber. Their values on the publisher are irrelevant.
+
+Note that wal\_receiver\_timeout, wal\_receiver\_status\_interval and wal\_retrieve\_retry\_interval configuration parameters affect the logical replication workers as well.
+
+```
+max_logical_replication_workers (integer)
+```
+
+Specifies maximum number of logical replication workers. This includes both apply workers and table synchronization workers.
+
+Logical replication workers are taken from the pool defined by max\_worker\_processes.
+
+The default value is 4. This parameter can only be set at server start.
+
+```
+max_sync_workers_per_subscription (integer)
+```
+
+Maximum number of synchronization workers per subscription. This parameter controls the amount of parallelism of the initial data copy during the subscription initialization or when new tables are added.
+
+Currently, there can be only one synchronization worker per table.
+
+The synchronization workers are taken from the pool defined by max\_logical\_replication\_workers.
+
+The default value is 2. This parameter can only be set in the postgresql.conf file or on the server command line.

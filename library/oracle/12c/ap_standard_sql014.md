@@ -1,0 +1,8 @@
+# Oracle 12c - ap_standard_sql014
+Source: https://docs.oracle.com/database/121/SQLRF/ap_standard_sql014.htm
+
+# Oracle Compliance with Older Standards
+
+This release of Oracle Database conforms to SQL:2008 and SQL:2011, the most recent editions of the SQL standard, as itemized in preceding sections of this appendix. Oracle does not formally claim that this release of the database conforms to SQL-92—and in particular, to SQL-92 Entry Level—or to SQL:1999, because those standards have been superseded by SQL:2008 and SQL:2011. Some, mostly minor, changes between editions of the SQL standard might affect applications. The SQL standard, or a reference discussing that standard, can be consulted to determine the details of any incompatibilities that have been introduced. One important source is Annex E of SQL/Foundation:1999, SQL/Foundation:2003, SQL/Foundation:2008 and SQL/Foundation:2011.
+
+In some cases, this release of Oracle Database might continue to recognize constructs from older editions of SQL. Such recognition is often allowed as a valid vendor extension. It is the general policy of Oracle to keep incompatibilities between versions of the database as few as possible. This policy extends to retention of older forms when that is feasible. In any case, the differences between older SQL and SQL:2011 (as noted above) are relatively inconsequential.

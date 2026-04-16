@@ -1,0 +1,42 @@
+---
+source: MySQL 8.0 Reference
+title: 00_Overview
+---
+
+The hwinfo table provides information about the hardware on which a given data node executes.
+
+The hwinfo table contains the following columns:
+
+• node\_id
+
+Node ID
+
+• cpu\_cnt\_max
+
+Number of processors on this host
+
+• cpu\_cnt
+
+Number of processors available to this node
+
+• num\_cpu\_cores
+
+Number of CPU cores on this host
+
+• num\_cpu\_sockets
+
+Number of CPU sockets on this host
+
+• HW\_memory\_size
+
+Amount of memory available on this host
+
+• model\_name
+
+CPU model name
+
+### **Notes**
+
+The hwinfo table is available on all operating systems supported by NDB.
+
+This table was added in NDB 8.0.23.

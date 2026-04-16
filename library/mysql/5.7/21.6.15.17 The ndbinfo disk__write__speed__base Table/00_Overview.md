@@ -1,0 +1,36 @@
+---
+source: MySQL 5.7 Reference
+title: 00_Overview
+---
+
+The disk\_write\_speed\_base table provides base information about the speed of disk writes during LCP, backup, and restore operations.
+
+The disk\_write\_speed\_base table contains the following columns:
+
+• node\_id
+
+Node ID of this node
+
+• thr\_no
+
+Thread ID of this LDM thread
+
+• millis\_ago
+
+Milliseconds since this reporting period ended
+
+• millis\_passed
+
+Milliseconds elapsed in this reporting period
+
+• backup\_lcp\_bytes\_written
+
+Number of bytes written to disk by local checkpoints and backup processes during this period
+
+• redo\_bytes\_written
+
+Number of bytes written to REDO log during this period
+
+• target\_disk\_write\_speed
+
+Actual speed of disk writes per LDM thread (base data)

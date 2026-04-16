@@ -1,0 +1,902 @@
+---
+source: MySQL 8.4 Reference
+title: 00_Overview
+---
+
+The section provides information about installing NDB Cluster on Debian and related Linux distributions such Ubuntu using the .deb files supplied by Oracle for this purpose.
+
+Oracle also provides an NDB Cluster APT repository for Debian and other distributions. See [Installing](https://dev.mysql.com/doc/mysql-apt-repo-quick-guide/en/#repo-qg-apt-cluster-install) [MySQL NDB Cluster Using the APT Repository](https://dev.mysql.com/doc/mysql-apt-repo-quick-guide/en/#repo-qg-apt-cluster-install), for instructions and additional information.
+
+Oracle provides .deb installer files for NDB Cluster for 32-bit and 64-bit platforms. For a Debianbased system, only a single installer file is necessary. This file is named using the pattern shown here, according to the applicable NDB Cluster version, Debian version, and architecture:
+
+```
+mysql-cluster-gpl-ndbver-debiandebianver-arch.deb
+```
+
+Here, ndbver is the 3-part NDB engine version number, debianver is the major version of Debian (8 or 9), and arch is one of i686 or x86\_64. In the examples that follow, we assume you wish to install NDB 8.4.6 on a 64-bit Debian 9 system; in this case, the installer file is named mysql-clustergpl-8.4.6-debian9-x86\_64.deb-bundle.tar.
+
+Once you have downloaded the appropriate .deb file, you can untar it, and then install it from the command line using dpkg, like this:
+
+```
+$> dpkg -i mysql-cluster-gpl-8.4.6-debian9-i686.deb
+```
+
+You can also remove it using dpkg as shown here:
+
+```
+$> dpkg -r mysql
+```
+
+The installer file should also be compatible with most graphical package managers that work with .deb files, such as GDebi for the Gnome desktop.
+
+The .deb file installs NDB Cluster under /opt/mysql/server-version/, where version is the 2-part release series version for the included MySQL server. For NDB 8.4, this is always 8.4. The directory layout is the same as that for the generic Linux binary distribution (see Table 2.3, "MySQL Installation Layout for Generic Unix/Linux Binary Package"), with the exception that startup scripts and configuration files are found in support-files instead of share. All NDB Cluster executables, such as ndb\_mgm, ndbd, and ndb\_mgmd, are placed in the bin directory.
+
+# <span id="page-90-0"></span>**25.3.1.4 Building NDB Cluster from Source on Linux**
+
+This section provides information about compiling NDB Cluster on Linux and other Unix-like platforms. Building NDB Cluster from source is similar to building the standard MySQL Server, although it differs in a few key respects discussed here. For general information about building MySQL from source, see Section 2.8, "Installing MySQL from Source". For information about compiling NDB Cluster on Windows platforms, see [Section 25.3.2.2, "Compiling and Installing NDB Cluster from Source on Windows"](#page-95-0).
+
+MySQL NDB Cluster 8.4 is built from the MySQL Server 8.4 sources, available from the MySQL downloads page at [https://dev.mysql.com/downloads/.](https://dev.mysql.com/downloads/) The archived source file should have a name similar to mysql-8.4.6.tar.gz. You can also obtain the sources from GitHub at [https://github.com/](https://github.com/mysql/mysql-server) [mysql/mysql-server](https://github.com/mysql/mysql-server).
+
+The WITH\_NDB option for CMake causes the binaries for the management nodes, data nodes, and other NDB Cluster programs to be built; it also causes mysqld to be compiled with [NDB](#page-50-0) storage engine support. This option is required when building NDB Cluster.
+
+![](_page_91_Picture_1.jpeg)
+
+### **Important**
+
+The WITH\_NDB\_JAVA option is enabled by default. This means that, by default, if CMake cannot find the location of Java on your system, the configuration process fails; if you do not wish to enable Java and ClusterJ support, you must indicate this explicitly by configuring the build using -DWITH\_NDB\_JAVA=OFF. Use WITH\_CLASSPATH to provide the Java classpath if needed.
+
+For more information about CMake options specific to building NDB Cluster, see CMake Options for Compiling NDB Cluster.
+
+After you have run make && make install (or your system's equivalent), the result is similar to what is obtained by unpacking a precompiled binary to the same location.
+
+**Management nodes.** When building from source and running the default make install, the management server and management client binaries (ndb\_mgmd and ndb\_mgm) can be found in / usr/local/mysql/bin. Only ndb\_mgmd is required to be present on a management node host; however, it is also a good idea to have ndb\_mgm present on the same host machine. Neither of these executables requires a specific location on the host machine's file system.
+
+**Data nodes.** The only executable required on a data node host is the data node binary ndbd or ndbmtd. (mysqld, for example, does not have to be present on the host machine.) By default, when building from source, this file is placed in the directory /usr/local/mysql/bin. For installing on multiple data node hosts, only ndbd or ndbmtd need be copied to the other host machine or machines. (This assumes that all data node hosts use the same architecture and operating system; otherwise you may need to compile separately for each different platform.) The data node binary need not be in any particular location on the host's file system, as long as the location is known.
+
+When compiling NDB Cluster from source, no special options are required for building multithreaded data node binaries. Configuring the build with [NDB](#page-50-0) storage engine support causes ndbmtd to be built automatically; make install places the ndbmtd binary in the installation bin directory along with mysqld, ndbd, and ndb\_mgm.
+
+**SQL nodes.** If you compile MySQL with clustering support, and perform the default installation (using make install as the system root user), mysqld is placed in /usr/local/mysql/bin. Follow the steps given in Section 2.8, "Installing MySQL from Source" to make mysqld ready for use. If you want to run multiple SQL nodes, you can use a copy of the same mysqld executable and its associated support files on several machines. The easiest way to do this is to copy the entire /usr/ local/mysql directory and all directories and files contained within it to the other SQL node host or hosts, then repeat the steps from Section 2.8, "Installing MySQL from Source" on each machine. If you configure the build with a nondefault PREFIX option, you must adjust the directory accordingly.
+
+In [Section 25.3.3, "Initial Configuration of NDB Cluster"](#page-100-0), we create configuration files for all of the nodes in our example NDB Cluster.
+
+# <span id="page-91-0"></span>**25.3.2 Installing NDB Cluster on Windows**
+
+This section describes installation procedures for NDB Cluster on Windows hosts. NDB Cluster 8.4 binaries for Windows can be obtained from <https://dev.mysql.com/downloads/cluster/>. For information about installing NDB Cluster on Windows from a binary release provided by Oracle, see [Section 25.3.2.1, "Installing NDB Cluster on Windows from a Binary Release"](#page-91-1).
+
+It is also possible to compile and install NDB Cluster from source on Windows using Microsoft Visual Studio. For more information, see [Section 25.3.2.2, "Compiling and Installing NDB Cluster from Source](#page-95-0) [on Windows".](#page-95-0)
+
+# <span id="page-91-1"></span>**25.3.2.1 Installing NDB Cluster on Windows from a Binary Release**
+
+This section describes a basic installation of NDB Cluster on Windows using a binary "no-install" NDB Cluster release provided by Oracle, using the same 4-node setup outlined in the beginning of this section (see [Section 25.3, "NDB Cluster Installation"\)](#page-81-0), as shown in the following table:
+
+**Table 25.6 Network addresses of nodes in example cluster**
+
+| Node                   | IP Address    |
+|------------------------|---------------|
+| Management node (mgmd) | 198.51.100.10 |
+| SQL node (mysqld)      | 198.51.100.20 |
+| Data node "A" (ndbd)   | 198.51.100.30 |
+| Data node "B" (ndbd)   | 198.51.100.40 |
+
+As on other platforms, the NDB Cluster host computer running an SQL node must have installed on it a MySQL Server binary (mysqld.exe). You should also have the MySQL client (mysql.exe) on this host. For management nodes and data nodes, it is not necessary to install the MySQL Server binary; however, each management node requires the management server daemon (ndb\_mgmd.exe); each data node requires the data node daemon (ndbd.exe or ndbmtd.exe). For this example, we refer to ndbd.exe as the data node executable, but you can install ndbmtd.exe, the multithreaded version of this program, instead, in exactly the same way. You should also install the management client (ndb\_mgm.exe) on the management server host. This section covers the steps necessary to install the correct Windows binaries for each type of NDB Cluster node.
+
+![](_page_92_Picture_4.jpeg)
+
+#### **Note**
+
+As with other Windows programs, NDB Cluster executables are named with the .exe file extension. However, it is not necessary to include the .exe extension when invoking these programs from the command line. Therefore, we often simply refer to these programs in this documentation as mysqld, mysql, ndb\_mgmd, and so on. You should understand that, whether we refer (for example) to mysqld or mysqld.exe, either name means the same thing (the MySQL Server program).
+
+For setting up an NDB Cluster using Oracles's no-install binaries, the first step in the installation process is to download the latest NDB Cluster Windows ZIP binary archive from [https://dev.mysql.com/](https://dev.mysql.com/downloads/cluster/) [downloads/cluster/.](https://dev.mysql.com/downloads/cluster/) This archive has a filename of the mysql-cluster-gpl-ver-winarch.zip, where ver is the NDB storage engine version (such as 8.4.6), and arch is the architecture (32 for 32 bit binaries, and 64 for 64-bit binaries). For example, the NDB Cluster 8.4.6 archive for 64-bit Windows systems is named mysql-cluster-gpl-8.4.6-win64.zip.
+
+You can run 32-bit NDB Cluster binaries on both 32-bit and 64-bit versions of Windows; however, 64 bit NDB Cluster binaries can be used only on 64-bit versions of Windows. If you are using a 32-bit version of Windows on a computer that has a 64-bit CPU, then you must use the 32-bit NDB Cluster binaries.
+
+To minimize the number of files that need to be downloaded from the Internet or copied between machines, we start with the computer where you intend to run the SQL node.
+
+**SQL node.** We assume that you have placed a copy of the archive in the directory C:\Documents and Settings\username\My Documents\Downloads on the computer having the IP address 198.51.100.20, where username is the name of the current user. (You can obtain this name using ECHO %USERNAME% on the command line.) To install and run NDB Cluster executables as Windows services, this user should be a member of the Administrators group.
+
+Extract all the files from the archive. The Extraction Wizard integrated with Windows Explorer is adequate for this task. (If you use a different archive program, be sure that it extracts all files and directories from the archive, and that it preserves the archive's directory structure.) When you are asked for a destination directory, enter C:\, which causes the Extraction Wizard to extract the archive to the directory C:\mysql-cluster-gpl-ver-winarch. Rename this directory to C:\mysql.
+
+It is possible to install the NDB Cluster binaries to directories other than C:\mysql\bin; however, if you do so, you must modify the paths shown in this procedure accordingly. In particular, if the MySQL Server (SQL node) binary is installed to a location other than C:\mysql or C:\Program Files \MySQL\MySQL Server 8.4, or if the SQL node's data directory is in a location other than C:
+
+\mysql\data or C:\Program Files\MySQL\MySQL Server 8.4\data, extra configuration options must be used on the command line or added to the my.ini or my.cnf file when starting the SQL node. For more information about configuring a MySQL Server to run in a nonstandard location, see Section 2.3.3, "Configuration: Manually".
+
+For a MySQL Server with NDB Cluster support to run as part of an NDB Cluster, it must be started with the options --ndbcluster and --ndb-connectstring. While you can specify these options on the command line, it is usually more convenient to place them in an option file. To do this, create a new text file in Notepad or another text editor. Enter the following configuration information into this file:
+
+```
+[mysqld]
+# Options for mysqld process:
+ndbcluster # run NDB storage engine
+ndb-connectstring=198.51.100.10 # location of management server
+```
+
+You can add other options used by this MySQL Server if desired (see Section 2.3.3.2, "Creating an Option File"), but the file must contain the options shown, at a minimum. Save this file as C:\mysql \my.ini. This completes the installation and setup for the SQL node.
+
+**Data nodes.** An NDB Cluster data node on a Windows host requires only a single executable, one of either ndbd.exe or ndbmtd.exe. For this example, we assume that you are using ndbd.exe, but the same instructions apply when using ndbmtd.exe. On each computer where you wish to run a data node (the computers having the IP addresses 198.51.100.30 and 198.51.100.40), create the directories C:\mysql, C:\mysql\bin, and C:\mysql\cluster-data; then, on the computer where you downloaded and extracted the no-install archive, locate ndbd.exe in the C:\mysql \bin directory. Copy this file to the C:\mysql\bin directory on each of the two data node hosts.
+
+To function as part of an NDB Cluster, each data node must be given the address or hostname of the management server. You can supply this information on the command line using the --ndbconnectstring or -c option when starting each data node process. However, it is usually preferable to put this information in an option file. To do this, create a new text file in Notepad or another text editor and enter the following text:
+
+```
+[mysql_cluster]
+# Options for data node process:
+ndb-connectstring=198.51.100.10 # location of management server
+```
+
+Save this file as C:\mysql\my.ini on the data node host. Create another text file containing the same information and save it on as C:mysql\my.ini on the other data node host, or copy the my.ini file from the first data node host to the second one, making sure to place the copy in the second data node's C:\mysql directory. Both data node hosts are now ready to be used in the NDB Cluster, which leaves only the management node to be installed and configured.
+
+**Management node.** The only executable program required on a computer used for hosting an NDB Cluster management node is the management server program ndb\_mgmd.exe. However, in order to administer the NDB Cluster once it has been started, you should also install the NDB Cluster management client program ndb\_mgm.exe on the same machine as the management server. Locate these two programs on the machine where you downloaded and extracted the no-install archive; this should be the directory C:\mysql\bin on the SQL node host. Create the directory C:\mysql \bin on the computer having the IP address 198.51.100.10, then copy both programs to this directory.
+
+You should now create two configuration files for use by ndb\_mgmd.exe:
+
+1. A local configuration file to supply configuration data specific to the management node itself. Typically, this file needs only to supply the location of the NDB Cluster global configuration file (see item 2).
+
+To create this file, start a new text file in Notepad or another text editor, and enter the following information:
+
+```
+[mysql_cluster]
+# Options for management node process
+```
+
+```
+config-file=C:/mysql/bin/config.ini
+```
+
+Save this file as the text file C:\mysql\bin\my.ini.
+
+- 2. A global configuration file from which the management node can obtain configuration information governing the NDB Cluster as a whole. At a minimum, this file must contain a section for each node in the NDB Cluster, and the IP addresses or hostnames for the management node and all data nodes (HostName configuration parameter). It is also advisable to include the following additional information:
+  - The IP address or hostname of any SQL nodes
+  - The data memory and index memory allocated to each data node ([DataMemory](#page-156-0) and [IndexMemory](#page-157-0) configuration parameters)
+  - The number of fragment replicas, using the [NoOfReplicas](#page-153-0) configuration parameter (see [Section 25.2.2, "NDB Cluster Nodes, Node Groups, Fragment Replicas, and Partitions"\)](#page-58-0)
+  - The directory where each data node stores it data and log file, and the directory where the management node keeps its log files (in both cases, the [DataDir](#page-154-0) configuration parameter)
+
+Create a new text file using a text editor such as Notepad, and input the following information:
+
+```
+[ndbd default]
+# Options affecting ndbd processes on all data nodes:
+NoOfReplicas=2 # Number of fragment replicas
+DataDir=C:/mysql/cluster-data # Directory for each data node's data files
+ # Forward slashes used in directory path,
+ # rather than backslashes. This is correct;
+ # see Important note in text
+DataMemory=80M # Memory allocated to data storage
+IndexMemory=18M # Memory allocated to index storage
+ # For DataMemory and IndexMemory, we have used the
+ # default values. Since the "world" database takes up
+ # only about 500KB, this should be more than enough for
+ # this example Cluster setup.
+[ndb_mgmd]
+# Management process options:
+HostName=198.51.100.10 # Hostname or IP address of management node
+DataDir=C:/mysql/bin/cluster-logs # Directory for management node log files
+[ndbd]
+# Options for data node "A":
+ # (one [ndbd] section per data node)
+HostName=198.51.100.30 # Hostname or IP address
+[ndbd]
+# Options for data node "B":
+HostName=198.51.100.40 # Hostname or IP address
+[mysqld]
+# SQL node options:
+HostName=198.51.100.20 # Hostname or IP address
+```
+
+Save this file as the text file C:\mysql\bin\config.ini.
+
+![](_page_94_Picture_11.jpeg)
+
+### **Important**
+
+A single backslash character (\) cannot be used when specifying directory paths in program options or configuration files used by NDB Cluster on Windows. Instead, you must either escape each backslash character with a second backslash (\\), or replace the backslash with a forward slash character (/). For example, the following line from the [ndb\_mgmd] section of an NDB Cluster config.ini file does not work:
+
+DataDir=C:\mysql\bin\cluster-logs
+
+Instead, you may use either of the following:
+
+```
+DataDir=C:\\mysql\\bin\\cluster-logs # Escaped backslashes
+DataDir=C:/mysql/bin/cluster-logs # Forward slashes
+```
+
+For reasons of brevity and legibility, we recommend that you use forward slashes in directory paths used in NDB Cluster program options and configuration files on Windows.
+
+# <span id="page-95-0"></span>**25.3.2.2 Compiling and Installing NDB Cluster from Source on Windows**
+
+Oracle provides precompiled NDB Cluster binaries for Windows which should be adequate for most users. However, if you wish, it is also possible to compile NDB Cluster for Windows from source code. The procedure for doing this is almost identical to the procedure used to compile the standard MySQL Server binaries for Windows, and uses the same tools. However, there are two major differences:
+
+- MySQL NDB Cluster 8.4 is built from the MySQL Server 8.4 sources, available from the MySQL downloads page at [https://dev.mysql.com/downloads/.](https://dev.mysql.com/downloads/) The archived source file should have a name similar to mysql-8.4.6.tar.gz. You can also obtain the sources from GitHub at [https://](https://github.com/mysql/mysql-server) [github.com/mysql/mysql-server.](https://github.com/mysql/mysql-server)
+- You must configure the build using the WITH\_NDB option in addition to any other build options you wish to use with CMake. WITH\_NDBCLUSTER is also supported for backwards compatibility, but is deprecated and subject to future removal.
+
+![](_page_95_Picture_8.jpeg)
+
+#### **Important**
+
+The WITH\_NDB\_JAVA option is enabled by default. This means that, by default, if CMake cannot find the location of Java on your system, the configuration process fails; if you do not wish to enable Java and ClusterJ support, you must indicate this explicitly by configuring the build using -DWITH\_NDB\_JAVA=OFF. (Bug #12379735) Use WITH\_CLASSPATH to provide the Java classpath if needed.
+
+For more information about CMake options specific to building NDB Cluster, see CMake Options for Compiling NDB Cluster.
+
+Once the build process is complete, you can create a Zip archive containing the compiled binaries; Section 2.8.4, "Installing MySQL Using a Standard Source Distribution" provides the commands needed to perform this task on Windows systems. The NDB Cluster binaries can be found in the bin directory of the resulting archive, which is equivalent to the no-install archive, and which can be installed and configured in the same manner. For more information, see [Section 25.3.2.1, "Installing](#page-91-1) [NDB Cluster on Windows from a Binary Release".](#page-91-1)
+
+# <span id="page-95-1"></span>**25.3.2.3 Initial Startup of NDB Cluster on Windows**
+
+Once the NDB Cluster executables and needed configuration files are in place, performing an initial start of the cluster is simply a matter of starting the NDB Cluster executables for all nodes in the cluster. Each cluster node process must be started separately, and on the host computer where it resides. The management node should be started first, followed by the data nodes, and then finally by any SQL nodes.
+
+1. On the management node host, issue the following command from the command line to start the management node process. The output should appear similar to what is shown here:
+
+```
+C:\mysql\bin> ndb_mgmd
+2010-06-23 07:53:34 [MgmtSrvr] INFO -- NDB Cluster Management Server. mysql-8.4.7-ndb-8.4.7
+2010-06-23 07:53:34 [MgmtSrvr] INFO -- Reading cluster configuration from 'config.ini'
+```
+
+The management node process continues to print logging output to the console. This is normal, because the management node is not running as a Windows service. (If you have used NDB
+
+Cluster on a Unix-like platform such as Linux, you may notice that the management node's default behavior in this regard on Windows is effectively the opposite of its behavior on Unix systems, where it runs by default as a Unix daemon process. This behavior is also true of NDB Cluster data node processes running on Windows.) For this reason, do not close the window in which ndb\_mgmd.exe is running; doing so kills the management node process. (See [Section 25.3.2.4,](#page-98-0) ["Installing NDB Cluster Processes as Windows Services",](#page-98-0) where we show how to install and run NDB Cluster processes as Windows services.)
+
+The required -f option tells the management node where to find the global configuration file (config.ini). The long form of this option is --config-file.
+
+![](_page_96_Picture_3.jpeg)
+
+#### **Important**
+
+An NDB Cluster management node caches the configuration data that it reads from config.ini; once it has created a configuration cache, it ignores the config.ini file on subsequent starts unless forced to do otherwise. This means that, if the management node fails to start due to an error in this file, you must make the management node re-read config.ini after you have corrected any errors in it. You can do this by starting ndb\_mgmd.exe with the --reload or --initial option on the command line. Either of these options works to refresh the configuration cache.
+
+It is not necessary or advisable to use either of these options in the management node's my.ini file.
+
+2. On each of the data node hosts, run the command shown here to start the data node processes:
+
+```
+C:\mysql\bin> ndbd
+2010-06-23 07:53:46 [ndbd] INFO -- Configuration fetched from 'localhost:1186', generation: 1
+```
+
+In each case, the first line of output from the data node process should resemble what is shown in the preceding example, and is followed by additional lines of logging output. As with the management node process, this is normal, because the data node is not running as a Windows service. For this reason, do not close the console window in which the data node process is running; doing so kills ndbd.exe. (For more information, see [Section 25.3.2.4, "Installing NDB](#page-98-0) [Cluster Processes as Windows Services"](#page-98-0).)
+
+3. Do not start the SQL node yet; it cannot connect to the cluster until the data nodes have finished starting, which may take some time. Instead, in a new console window on the management node host, start the NDB Cluster management client ndb\_mgm.exe, which should be in C:\mysql\bin on the management node host. (Do not try to re-use the console window where ndb\_mgmd.exe is running by typing **CTRL**+**C**, as this kills the management node.) The resulting output should look like this:
+
+```
+C:\mysql\bin> ndb_mgm
+-- NDB Cluster -- Management Client --
+ndb_mgm>
+```
+
+When the prompt ndb\_mgm> appears, this indicates that the management client is ready to receive NDB Cluster management commands. You can observe the status of the data nodes as they start by entering ALL STATUS at the management client prompt. This command causes a running report of the data nodes's startup sequence, which should look something like this:
+
+```
+ndb_mgm> ALL STATUS
+Connected to Management Server at: localhost:1186 (using cleartext)
+Node 2: starting (Last completed phase 3) (mysql-8.4.7-ndb-8.4.7)
+Node 3: starting (Last completed phase 3) (mysql-8.4.7-ndb-8.4.7)
+Node 2: starting (Last completed phase 4) (mysql-8.4.7-ndb-8.4.7)
+Node 3: starting (Last completed phase 4) (mysql-8.4.7-ndb-8.4.7)
+Node 2: Started (version 8.4.7)
+```
+
+```
+Node 3: Started (version 8.4.7)
+ndb_mgm>
+```
+
+![](_page_97_Picture_2.jpeg)
+
+#### **Note**
+
+Commands issued in the management client are not case-sensitive; we use uppercase as the canonical form of these commands, but you are not required to observe this convention when inputting them into the ndb\_mgm client. For more information, see Section 25.6.1, "Commands in the NDB Cluster Management Client".
+
+The output produced by ALL STATUS is likely to vary from what is shown here, according to the speed at which the data nodes are able to start, the release version number of the NDB Cluster software you are using, and other factors. What is significant is that, when you see that both data nodes have started, you are ready to start the SQL node.
+
+You can leave ndb\_mgm.exe running; it has no negative impact on the performance of the NDB Cluster, and we use it in the next step to verify that the SQL node is connected to the cluster after you have started it.
+
+4. On the computer designated as the SQL node host, open a console window and navigate to the directory where you unpacked the NDB Cluster binaries (if you are following our example, this is C: \mysql\bin).
+
+Start the SQL node by invoking mysqld.exe from the command line, as shown here:
+
+```
+C:\mysql\bin> mysqld --console
+```
+
+The --console option causes logging information to be written to the console, which can be helpful in the event of problems. (Once you are satisfied that the SQL node is running in a satisfactory manner, you can stop it and restart it out without the --console option, so that logging is performed normally.)
+
+In the console window where the management client (ndb\_mgm.exe) is running on the management node host, enter the SHOW command, which should produce output similar to what is shown here:
+
+```
+ndb_mgm> SHOW
+Connected to Management Server at: localhost:1186 (using cleartext)
+Cluster Configuration
+---------------------
+[ndbd(NDB)] 2 node(s)
+id=2 @198.51.100.30 (Version: 8.4.7-ndb-8.4.7, Nodegroup: 0, *)
+id=3 @198.51.100.40 (Version: 8.4.7-ndb-8.4.7, Nodegroup: 0)
+[ndb_mgmd(MGM)] 1 node(s)
+id=1 @198.51.100.10 (Version: 8.4.7-ndb-8.4.7)
+[mysqld(API)] 1 node(s)
+id=4 @198.51.100.20 (Version: 8.4.7-ndb-8.4.7)
+```
+
+You can also verify that the SQL node is connected to the NDB Cluster in the mysql client (mysql.exe) using the SHOW ENGINE NDB STATUS statement.
+
+You should now be ready to work with database objects and data using NDB Cluster 's [NDBCLUSTER](#page-50-0) storage engine. See [Section 25.3.5, "NDB Cluster Example with Tables and Data"](#page-102-0), for more information and examples.
+
+You can also install ndb\_mgmd.exe, ndbd.exe, and ndbmtd.exe as Windows services. For information on how to do this, see [Section 25.3.2.4, "Installing NDB Cluster Processes as Windows](#page-98-0) [Services"\)](#page-98-0).
+
+# <span id="page-98-0"></span>**25.3.2.4 Installing NDB Cluster Processes as Windows Services**
+
+Once you are satisfied that NDB Cluster is running as desired, you can install the management nodes and data nodes as Windows services, so that these processes are started and stopped automatically whenever Windows is started or stopped. This also makes it possible to control these processes from the command line with the appropriate SC START and SC STOP commands, or using the Windows graphical Services utility. NET START and NET STOP commands can also be used.
+
+Installing programs as Windows services usually must be done using an account that has Administrator rights on the system.
+
+To install the management node as a service on Windows, invoke ndb\_mgmd.exe from the command line on the machine hosting the management node, using the --install option, as shown here:
+
+```
+C:\> C:\mysql\bin\ndb_mgmd.exe --install
+Installing service 'NDB Cluster Management Server'
+ as '"C:\mysql\bin\ndbd.exe" "--service=ndb_mgmd"'
+Service successfully installed.
+```
+
+![](_page_98_Picture_6.jpeg)
+
+#### **Important**
+
+When installing an NDB Cluster program as a Windows service, you should always specify the complete path; otherwise the service installation may fail with the error The system cannot find the file specified.
+
+The --install option must be used first, ahead of any other options that might be specified for ndb\_mgmd.exe. However, it is preferable to specify such options in an options file instead. If your options file is not in one of the default locations as shown in the output of ndb\_mgmd.exe --help, you can specify the location using the --config-file option.
+
+Now you should be able to start and stop the management server like this:
+
+```
+C:\> SC START ndb_mgmd
+C:\> SC STOP ndb_mgmd
+```
+
+![](_page_98_Picture_12.jpeg)
+
+# **Note**
+
+If using NET commands, you can also start or stop the management server as a Windows service using the descriptive name, as shown here:
+
+```
+C:\> NET START 'NDB Cluster Management Server'
+The NDB Cluster Management Server service is starting.
+The NDB Cluster Management Server service was started successfully.
+C:\> NET STOP 'NDB Cluster Management Server'
+The NDB Cluster Management Server service is stopping..
+The NDB Cluster Management Server service was stopped successfully.
+```
+
+It is usually simpler to specify a short service name or to permit the default service name to be used when installing the service, and then reference that name when starting or stopping the service. To specify a service name other than ndb\_mgmd, append it to the --install option, as shown in this example:
+
+```
+C:\> C:\mysql\bin\ndb_mgmd.exe --install=mgmd1
+Installing service 'NDB Cluster Management Server'
+ as '"C:\mysql\bin\ndb_mgmd.exe" "--service=mgmd1"'
+Service successfully installed.
+```
+
+Now you should be able to start or stop the service using the name you have specified, like this:
+
+```
+C:\> SC START mgmd1
+C:\> SC STOP mgmd1
+```
+
+To remove the management node service, use SC DELETE service\_name:
+
+```
+C:\> SC DELETE mgmd1
+```
+
+Alternatively, invoke ndb\_mgmd.exe with the --remove option, as shown here:
+
+```
+C:\> C:\mysql\bin\ndb_mgmd.exe --remove
+Removing service 'NDB Cluster Management Server'
+Service successfully removed.
+```
+
+If you installed the service using a service name other than the default, pass the service name as the value of the ndb\_mgmd.exe --remove option, like this:
+
+```
+C:\> C:\mysql\bin\ndb_mgmd.exe --remove=mgmd1
+Removing service 'mgmd1'
+Service successfully removed.
+```
+
+Installation of an NDB Cluster data node process as a Windows service can be done in a similar fashion, using the --install option for ndbd.exe (or ndbmtd.exe), as shown here:
+
+```
+C:\> C:\mysql\bin\ndbd.exe --install
+Installing service 'NDB Cluster Data Node Daemon' as '"C:\mysql\bin\ndbd.exe" "--service=ndbd"'
+Service successfully installed.
+```
+
+Now you can start or stop the data node as shown in the following example:
+
+```
+C:\> SC START ndbd
+C:\> SC STOP ndbd
+```
+
+To remove the data node service, use SC DELETE service\_name:
+
+```
+C:\> SC DELETE ndbd
+```
+
+Alternatively, invoke ndbd.exe with the --remove option, as shown here:
+
+```
+C:\> C:\mysql\bin\ndbd.exe --remove
+Removing service 'NDB Cluster Data Node Daemon'
+Service successfully removed.
+```
+
+As with ndb\_mgmd.exe (and mysqld.exe), when installing ndbd.exe as a Windows service, you can also specify a name for the service as the value of --install, and then use it when starting or stopping the service, like this:
+
+```
+C:\> C:\mysql\bin\ndbd.exe --install=dnode1
+Installing service 'dnode1' as '"C:\mysql\bin\ndbd.exe" "--service=dnode1"'
+Service successfully installed.
+C:\> SC START dnode1
+C:\> SC STOP dnode1
+```
+
+If you specified a service name when installing the data node service, you can use this name when removing it as well, as shown here:
+
+```
+C:\> SC DELETE dnode1
+```
+
+Alternatively, you can pass the service name as the value of the ndbd.exe --remove option, as shown here:
+
+```
+C:\> C:\mysql\bin\ndbd.exe --remove=dnode1
+Removing service 'dnode1'
+Service successfully removed.
+```
+
+Installation of the SQL node as a Windows service, starting the service, stopping the service, and removing the service are done in a similar fashion, using mysqld --install, SC START, SC STOP, and SC DELETE (or mysqld --remove). NET commands can also be used to start or stop a service. For additional information, see Section 2.3.3.8, "Starting MySQL as a Windows Service".
+
+# <span id="page-100-0"></span>**25.3.3 Initial Configuration of NDB Cluster**
+
+In this section, we discuss manual configuration of an installed NDB Cluster by creating and editing configuration files.
+
+For our four-node, four-host NDB Cluster (see [Cluster nodes and host computers](#page-81-1)), it is necessary to write four configuration files, one per node host.
+
+• Each data node or SQL node requires a my.cnf file that provides two pieces of information: a connection string that tells the node where to find the management node, and a line telling the MySQL server on this host (the machine hosting the data node) to enable the [NDBCLUSTER](#page-50-0) storage engine.
+
+For more information on connection strings, see [Section 25.4.3.3, "NDB Cluster Connection Strings".](#page-138-0)
+
+• The management node needs a config.ini file telling it how many fragment replicas to maintain, how much memory to allocate for data and indexes on each data node, where to find the data nodes, where to save data to disk on each data node, and where to find any SQL nodes.
+
+**Configuring the data nodes and SQL nodes.** The my.cnf file needed for the data nodes is fairly simple. The configuration file should be located in the /etc directory and can be edited using any text editor. (Create the file if it does not exist.) For example:
+
+\$> **vi /etc/my.cnf**
+
+![](_page_100_Picture_10.jpeg)
+
+#### **Note**
+
+We show vi being used here to create the file, but any text editor should work just as well.
+
+For each data node and SQL node in our example setup, my.cnf should look like this:
+
+```
+[mysqld]
+# Options for mysqld process:
+ndbcluster # run NDB storage engine
+[mysql_cluster]
+# Options for NDB Cluster processes:
+ndb-connectstring=198.51.100.10 # location of management server
+```
+
+After entering the preceding information, save this file and exit the text editor. Do this for the machines hosting data node "A", data node "B", and the SQL node.
+
+![](_page_100_Picture_16.jpeg)
+
+#### **Important**
+
+Once you have started a mysqld process with the ndbcluster and ndbconnectstring parameters in the [mysqld] and [mysql\_cluster] sections of the my.cnf file as shown previously, you cannot execute any CREATE TABLE or ALTER TABLE statements without having actually started the cluster. Otherwise, these statements fail with an error. This is by design.
+
+**Configuring the management node.** The first step in configuring the management node is to create the directory in which the configuration file can be found and then to create the file itself. For example (running as root):
+
+```
+$> mkdir /var/lib/mysql-cluster
+$> cd /var/lib/mysql-cluster
+$> vi config.ini
+```
+
+For our representative setup, the config.ini file should read as follows:
+
+```
+[ndbd default]
+# Options affecting ndbd processes on all data nodes:
+NoOfReplicas=2 # Number of fragment replicas
+DataMemory=98M # How much memory to allocate for data storage
+[ndb_mgmd]
+# Management process options:
+HostName=198.51.100.10 # Hostname or IP address of management node
+DataDir=/var/lib/mysql-cluster # Directory for management node log files
+[ndbd]
+# Options for data node "A":
+ # (one [ndbd] section per data node)
+HostName=198.51.100.30 # Hostname or IP address
+NodeId=2 # Node ID for this data node
+DataDir=/usr/local/mysql/data # Directory for this data node's data files
+[ndbd]
+# Options for data node "B":
+HostName=198.51.100.40 # Hostname or IP address
+NodeId=3 # Node ID for this data node
+DataDir=/usr/local/mysql/data # Directory for this data node's data files
+[mysqld]
+# SQL node options:
+HostName=198.51.100.20 # Hostname or IP address
+ # (additional mysqld connections can be
+ # specified for this node for various
+ # purposes such as running ndb_restore)
+```
+
+![](_page_101_Picture_2.jpeg)
+
+#### **Note**
+
+The world database can be downloaded from [https://dev.mysql.com/doc/index](https://dev.mysql.com/doc/index-other.md)[other.html.](https://dev.mysql.com/doc/index-other.md)
+
+After all the configuration files have been created and these minimal options have been specified, you are ready to proceed with starting the cluster and verifying that all processes are running. We discuss how this is done in [Section 25.3.4, "Initial Startup of NDB Cluster"](#page-101-0).
+
+For more detailed information about the available NDB Cluster configuration parameters and their uses, see [Section 25.4.3, "NDB Cluster Configuration Files"](#page-131-0), and [Section 25.4, "Configuration of](#page-107-0) [NDB Cluster".](#page-107-0) For configuration of NDB Cluster as relates to making backups, see Section 25.6.8.3, "Configuration for NDB Cluster Backups".
+
+The default port for Cluster management nodes is 1186. For data nodes, the cluster can automatically allocate ports from those that are already free.
+
+# <span id="page-101-0"></span>**25.3.4 Initial Startup of NDB Cluster**
+
+Starting the cluster is not very difficult after it has been configured. Each cluster node process must be started separately, and on the host where it resides. The management node should be started first, followed by the data nodes, and then finally by any SQL nodes:
+
+1. On the management host, issue the following command from the system shell to start the management node process:
+
+```
+$> ndb_mgmd --initial -f /var/lib/mysql-cluster/config.ini
+```
+
+The first time that it is started, ndb\_mgmd must be told where to find its configuration file, using the -f or --config-file option. This option requires that --initial or --reload also be specified; see Section 25.5.4, "ndb\_mgmd — The NDB Cluster Management Server Daemon", for details.
+
+2. On each of the data node hosts, run this command to start the ndbd process:
+
+```
+$> ndbd
+```
+
+3. If you used RPM files to install MySQL on the cluster host where the SQL node is to reside, you can (and should) use the supplied startup script to start the MySQL server process on the SQL node.
+
+If all has gone well, and the cluster has been set up correctly, the cluster should now be operational. You can test this by invoking the ndb\_mgm management node client. The output should look like that shown here, although you might see some slight differences in the output depending upon the exact version of MySQL that you are using:
+
+```
+$> ndb_mgm
+-- NDB Cluster -- Management Client --
+ndb_mgm> SHOW
+Connected to Management Server at: localhost:1186 (using cleartext)
+Cluster Configuration
+---------------------
+[ndbd(NDB)] 2 node(s)
+id=2 @198.51.100.30 (Version: 8.4.7-ndb-8.4.7, Nodegroup: 0, *)
+id=3 @198.51.100.40 (Version: 8.4.7-ndb-8.4.7, Nodegroup: 0)
+[ndb_mgmd(MGM)] 1 node(s)
+id=1 @198.51.100.10 (Version: 8.4.7-ndb-8.4.7)
+[mysqld(API)] 1 node(s)
+id=4 @198.51.100.20 (Version: 8.4.7-ndb-8.4.7)
+```
+
+The SQL node is referenced here as [mysqld(API)], which reflects the fact that the mysqld process is acting as an NDB Cluster API node.
+
+![](_page_102_Picture_5.jpeg)
+
+# **Note**
+
+The IP address shown for a given NDB Cluster SQL or other API node in the output of SHOW is the address used by the SQL or API node to connect to the cluster data nodes, and not to any management node.
+
+You should now be ready to work with databases, tables, and data in NDB Cluster. See [Section 25.3.5,](#page-102-0) ["NDB Cluster Example with Tables and Data",](#page-102-0) for a brief discussion.
+
+# <span id="page-102-0"></span>**25.3.5 NDB Cluster Example with Tables and Data**
+
+![](_page_102_Picture_10.jpeg)
+
+# **Note**
+
+The information in this section applies to NDB Cluster running on both Unix and Windows platforms.
+
+Working with database tables and data in NDB Cluster is not much different from doing so in standard MySQL. There are two key points to keep in mind:
+
+• For a table to be replicated in the cluster, it must use the [NDBCLUSTER](#page-50-0) storage engine. To specify this, use the ENGINE=NDBCLUSTER or ENGINE=NDB option when creating the table:
+
+```
+CREATE TABLE tbl_name (col_name column_definitions) ENGINE=NDBCLUSTER;
+```
+
+Alternatively, for an existing table that uses a different storage engine, use ALTER TABLE to change the table to use [NDBCLUSTER](#page-50-0):
+
+```
+ALTER TABLE tbl_name ENGINE=NDBCLUSTER;
+```
+
+• Every [NDBCLUSTER](#page-50-0) table has a primary key. If no primary key is defined by the user when a table is created, the [NDBCLUSTER](#page-50-0) storage engine automatically generates a hidden one. Such a key takes up space just as does any other table index. (It is not uncommon to encounter problems due to insufficient memory for accommodating these automatically created indexes.)
+
+If you are importing tables from an existing database using the output of mysqldump, you can open the SQL script in a text editor and add the ENGINE option to any table creation statements, or replace any existing ENGINE options. Suppose that you have the world sample database on another MySQL server that does not support NDB Cluster, and you want to export the City table:
+
+```
+$> mysqldump --add-drop-table world City > city_table.sql
+```
+
+The resulting city\_table.sql file contains this table creation statement (and the INSERT statements necessary to import the table data):
+
+```
+DROP TABLE IF EXISTS `City`;
+CREATE TABLE `City` (
+ `ID` int(11) NOT NULL auto_increment,
+ `Name` char(35) NOT NULL default '',
+ `CountryCode` char(3) NOT NULL default '',
+ `District` char(20) NOT NULL default '',
+ `Population` int(11) NOT NULL default '0',
+ PRIMARY KEY (`ID`)
+) ENGINE=MyISAM;
+INSERT INTO `City` VALUES (1,'Kabul','AFG','Kabol',1780000);
+INSERT INTO `City` VALUES (2,'Qandahar','AFG','Qandahar',237500);
+INSERT INTO `City` VALUES (3,'Herat','AFG','Herat',186800);
+(remaining INSERT statements omitted)
+```
+
+You need to make sure that MySQL uses the [NDBCLUSTER](#page-50-0) storage engine for this table. There are two ways that this can be accomplished. One of these is to modify the table definition before importing it into the Cluster database. Using the City table as an example, modify the ENGINE option of the definition as follows:
+
+```
+DROP TABLE IF EXISTS `City`;
+CREATE TABLE `City` (
+ `ID` int(11) NOT NULL auto_increment,
+ `Name` char(35) NOT NULL default '',
+ `CountryCode` char(3) NOT NULL default '',
+ `District` char(20) NOT NULL default '',
+ `Population` int(11) NOT NULL default '0',
+ PRIMARY KEY (`ID`)
+) ENGINE=NDBCLUSTER;
+INSERT INTO `City` VALUES (1,'Kabul','AFG','Kabol',1780000);
+INSERT INTO `City` VALUES (2,'Qandahar','AFG','Qandahar',237500);
+INSERT INTO `City` VALUES (3,'Herat','AFG','Herat',186800);
+(remaining INSERT statements omitted)
+```
+
+This must be done for the definition of each table that is to be part of the clustered database. The easiest way to accomplish this is to do a search-and-replace on the file that contains the definitions and replace all instances of ENGINE=engine\_name with ENGINE=NDBCLUSTER. If you do not want to modify the file, you can use the unmodified file to create the tables, and then use ALTER TABLE to change their storage engine. The particulars are given later in this section.
+
+Assuming that you have already created a database named world on the SQL node of the cluster, you can then use the mysql command-line client to read city\_table.sql, and create and populate the corresponding table in the usual manner:
+
+```
+$> mysql world < city_table.sql
+```
+
+It is very important to keep in mind that the preceding command must be executed on the host where the SQL node is running (in this case, on the machine with the IP address 198.51.100.20).
+
+To create a copy of the entire world database on the SQL node, use mysqldump on the noncluster server to export the database to a file named world.sql (for example, in the /tmp directory). Then modify the table definitions as just described and import the file into the SQL node of the cluster like this:
+
+```
+$> mysql world < /tmp/world.sql
+```
+
+If you save the file to a different location, adjust the preceding instructions accordingly.
+
+Running SELECT queries on the SQL node is no different from running them on any other instance of a MySQL server. To run queries from the command line, you first need to log in to the MySQL Monitor in the usual way (specify the root password at the Enter password: prompt):
+
+```
+$> mysql -u root -p
+Enter password:
+Welcome to the MySQL monitor. Commands end with ; or \g.
+Your MySQL connection id is 1 to server version: 8.4.7-ndb-8.4.7
+Type 'help;' or '\h' for help. Type '\c' to clear the buffer.
+mysql>
+```
+
+We simply use the MySQL server's root account and assume that you have followed the standard security precautions for installing a MySQL server, including setting a strong root password. For more information, see Section 2.9.4, "Securing the Initial MySQL Account".
+
+It is worth taking into account that NDB Cluster nodes do not make use of the MySQL privilege system when accessing one another. Setting or changing MySQL user accounts (including the root account) effects only applications that access the SQL node, not interaction between nodes. See Section 25.6.19.2, "NDB Cluster and MySQL Privileges", for more information.
+
+If you did not modify the ENGINE clauses in the table definitions prior to importing the SQL script, you should run the following statements at this point:
+
+```
+mysql> USE world;
+mysql> ALTER TABLE City ENGINE=NDBCLUSTER;
+mysql> ALTER TABLE Country ENGINE=NDBCLUSTER;
+mysql> ALTER TABLE CountryLanguage ENGINE=NDBCLUSTER;
+```
+
+Selecting a database and running a SELECT query against a table in that database is also accomplished in the usual manner, as is exiting the MySQL Monitor:
+
+```
+mysql> USE world;
+mysql> SELECT Name, Population FROM City ORDER BY Population DESC LIMIT 5;
++-----------+------------+
+| Name | Population |
++-----------+------------+
+| Bombay | 10500000 |
+| Seoul | 9981619 |
+| São Paulo | 9968485 |
+| Shanghai | 9696300 |
+| Jakarta | 9604900 |
++-----------+------------+
+5 rows in set (0.34 sec)
+mysql> \q
+Bye
+$>
+```
+
+Applications that use MySQL can employ standard APIs to access [NDB](#page-50-0) tables. It is important to remember that your application must access the SQL node, and not the management or data nodes. This brief example shows how we might execute the SELECT statement just shown by using the PHP 5.X mysqli extension running on a Web server elsewhere on the network:
+
+```
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+ "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+ <meta http-equiv="Content-Type"
+ content="text/html; charset=iso-8859-1">
+ <title>SIMPLE mysqli SELECT</title>
+</head>
+<body>
+<?php
+ # connect to SQL node:
+```
+
+```
+ $link = new mysqli('198.51.100.20', 'root', 'root_password', 'world');
+ # parameters for mysqli constructor are:
+ # host, user, password, database
+ if( mysqli_connect_errno() )
+ die("Connect failed: " . mysqli_connect_error());
+ $query = "SELECT Name, Population
+ FROM City
+ ORDER BY Population DESC
+ LIMIT 5";
+ # if no errors...
+ if( $result = $link->query($query) )
+ {
+?>
+<table border="1" width="40%" cellpadding="4" cellspacing ="1">
+ <tbody>
+ <tr>
+ <th width="10%">City</th>
+ <th>Population</th>
+ </tr>
+<?
+ # then display the results...
+ while($row = $result->fetch_object())
+ printf("<tr>\n <td align=\"center\">%s</td><td>%d</td>\n</tr>\n",
+ $row->Name, $row->Population);
+?>
+ </tbody
+</table>
+<?
+ # ...and verify the number of rows that were retrieved
+ printf("<p>Affected rows: %d</p>\n", $link->affected_rows);
+ }
+ else
+ # otherwise, tell us what went wrong
+ echo mysqli_error();
+ # free the result set and the mysqli connection object
+ $result->close();
+ $link->close();
+?>
+</body>
+</html>
+```
+
+We assume that the process running on the Web server can reach the IP address of the SQL node.
+
+In a similar fashion, you can use the MySQL C API, Perl-DBI, Python-mysql, or MySQL Connectors to perform the tasks of data definition and manipulation just as you would normally with MySQL.
+
+# <span id="page-105-0"></span>**25.3.6 Safe Shutdown and Restart of NDB Cluster**
+
+To shut down the cluster, enter the following command in a shell on the machine hosting the management node:
+
+```
+$> ndb_mgm -e shutdown
+```
+
+The -e option here is used to pass a command to the ndb\_mgm client from the shell. The command causes the ndb\_mgm, ndb\_mgmd, and any ndbd or ndbmtd processes to terminate gracefully. Any SQL nodes can be terminated using mysqladmin shutdown and other means. On Windows platforms, assuming that you have installed the SQL node as a Windows service, you can use SC STOP service\_name or NET STOP service\_name.
+
+To restart the cluster on Unix platforms, run these commands:
+
+• On the management host (198.51.100.10 in our example setup):
+
+```
+$> ndb_mgmd -f /var/lib/mysql-cluster/config.ini
+```
+
+• On each of the data node hosts (198.51.100.30 and 198.51.100.40):
+
+\$> **ndbd**
+
+- Use the ndb\_mgm client to verify that both data nodes have started successfully.
+- On the SQL host (198.51.100.20):
+
+```
+$> mysqld_safe &
+```
+
+On Windows platforms, assuming that you have installed all NDB Cluster processes as Windows services using the default service names (see [Section 25.3.2.4, "Installing NDB Cluster Processes as](#page-98-0) [Windows Services"](#page-98-0)), you can restart the cluster as follows:
+
+• On the management host (198.51.100.10 in our example setup), execute the following command:
+
+```
+C:\> SC START ndb_mgmd
+```
+
+• On each of the data node hosts (198.51.100.30 and 198.51.100.40), execute the following command:
+
+```
+C:\> SC START ndbd
+```
+
+- On the management node host, use the ndb\_mgm client to verify that the management node and both data nodes have started successfully (see [Section 25.3.2.3, "Initial Startup of NDB Cluster on](#page-95-1) [Windows"\)](#page-95-1).
+- On the SQL node host (198.51.100.20), execute the following command:
+
+```
+C:\> SC START mysql
+```
+
+In a production setting, it is usually not desirable to shut down the cluster completely. In many cases, even when making configuration changes, or performing upgrades to the cluster hardware or software (or both), which require shutting down individual host machines, it is possible to do so without shutting down the cluster as a whole by performing a rolling restart of the cluster. For more information about doing this, see Section 25.6.5, "Performing a Rolling Restart of an NDB Cluster".
+
+# <span id="page-106-0"></span>**25.3.7 Upgrading and Downgrading NDB Cluster**
+
+- [Versions Supported for Upgrade to NDB 8.4](#page-106-1)
+- [Known Issues When Upgrading or Downgrading NDB Cluster](#page-107-2)
+
+This section provides information about NDB Cluster software and compatibility between different NDB Cluster releases with regard to performing upgrades and downgrades. You should already be familiar with installing and configuring NDB Cluster prior to attempting an upgrade or downgrade. See [Section 25.4, "Configuration of NDB Cluster".](#page-107-0)
+
+For information about upgrades to NDB 8.4 from previous versions, see [Versions Supported for](#page-106-1) [Upgrade to NDB 8.4](#page-106-1).
+
+For information about known issues and problems encountered when upgrading or downgrading NDB 8.4, see [Known Issues When Upgrading or Downgrading NDB Cluster](#page-107-2).
+
+# <span id="page-106-1"></span>**Versions Supported for Upgrade to NDB 8.4**
+
+The following versions of NDB Cluster are supported for upgrades to NDB Cluster 8.4:
+
+- NDB Cluster 8.0: NDB 8.0.19 and later
+- NDB Cluster 8.1 (8.1.0)
+
+- NDB Cluster 8.2 (8.2.0)
+- NDB Cluster 8.3 (8.3.0)
+
+# <span id="page-107-2"></span>**Known Issues When Upgrading or Downgrading NDB Cluster**
+
+In this section, provide information about issues known to occur when upgrading or downgrading to or from NDB 8.4.
+
+We recommend that you not attempt any schema changes during any NDB Cluster software upgrade or downgrade. Some of the reasons for this are listed here:
+
+- DDL statements on NDB tables are not possible during some phases of data node startup.
+- DDL statements on NDB tables may be rejected if any data nodes are stopped during execution; stopping each data node binary (so it can be replaced with a binary from the target version) is required as part of the upgrade or downgrade process.
+- DDL statements on NDB tables are not allowed while there are data nodes in the same cluster running different release versions of the NDB Cluster software.
+
+For additional information regarding the rolling restart procedure used to perform an online upgrade or downgrade of the data nodes, see Section 25.6.5, "Performing a Rolling Restart of an NDB Cluster".
+
+# <span id="page-107-0"></span>**25.4 Configuration of NDB Cluster**
+
+A MySQL server that is part of an NDB Cluster differs in one chief respect from a normal (nonclustered) MySQL server, in that it employs the [NDB](#page-50-0) storage engine. This engine is also referred to sometimes as [NDBCLUSTER](#page-50-0), although NDB is preferred.
+
+To avoid unnecessary allocation of resources, the server is configured by default with the [NDB](#page-50-0) storage engine disabled. To enable [NDB](#page-50-0), you must modify the server's my.cnf configuration file, or start the server with the --ndbcluster option.
+
+This MySQL server is a part of the cluster, so it also must know how to access a management node to obtain the cluster configuration data. The default behavior is to look for the management node on localhost. However, should you need to specify that its location is elsewhere, this can be done in my.cnf, or with the mysql client. Before the [NDB](#page-50-0) storage engine can be used, at least one management node must be operational, as well as any desired data nodes.
+
+For more information about --ndbcluster and other mysqld options specific to NDB Cluster, see MySQL Server Options for NDB Cluster.
+
+For general information about installing NDB Cluster, see [Section 25.3, "NDB Cluster Installation".](#page-81-0)
+
+# <span id="page-107-1"></span>**25.4.1 Quick Test Setup of NDB Cluster**
+
+To familiarize you with the basics, we describe the simplest possible configuration for a functional NDB Cluster. After this, you should be able to design your desired setup from the information provided in the other relevant sections of this chapter.
+
+First, you need to create a configuration directory such as /var/lib/mysql-cluster, by executing the following command as the system root user:
+
+```
+$> mkdir /var/lib/mysql-cluster
+```
+
+In this directory, create a file named config.ini that contains the following information. Substitute appropriate values for HostName and DataDir as necessary for your system.
+
+```
+# file "config.ini" - showing minimal setup consisting of 1 data node,
+```
+
+```

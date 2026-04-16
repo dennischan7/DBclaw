@@ -1,0 +1,290 @@
+# Oracle 11g - statements_9020
+Source: https://docs.oracle.com/cd/E11882_01/server.112/e41084/statements_9020.htm
+
+# REVOKE
+
+Purpose
+
+Use the `REVOKE` statement to:
+
+* Revoke system privileges from users and roles
+* Revoke roles from users and roles
+* Revoke object privileges for a particular object from users and roles
+
+Note on Oracle Automatic Storage Management A user authenticated `AS` `SYSASM` can use this statement to revoke the system privileges `SYSASM`, `SYSOPER`, and `SYSDBA` from a user in the Oracle ASM password file of the current node.
+
+Note on Editionable Objects 
+
+A `REVOKE` operation to revoke object privileges on an editionable object actualizes the object in the current edition. See [Oracle Database Advanced Application Developer's Guide](../../appdev.112/e41502/adfns_editions.md#ADFNS99922) for more information about editions and editionable objects.
+
+Prerequisites
+
+To revoke a system privilege, you must have been granted the privilege with the `ADMIN` `OPTION`. You can revoke any privilege if you have the `GRANT` `ANY` `PRIVILEGE` system privilege.
+
+To revoke a role, you must have been granted the role with the `ADMIN` `OPTION`. You can revoke any role if you have the `GRANT` `ANY` `ROLE` system privilege.
+
+To revoke an object privilege, one of the following conditions must be met:
+
+* You must previously have granted the object privilege to the user or role.
+* You must have the `GRANT` `ANY` `OBJECT` `PRIVILEGE` system privilege. In this case, you can revoke any object privilege that was granted by the object owner or on behalf of the owner by a user with the `GRANT` `ANY` `OBJECT` `PRIVILEGE`. However, you cannot revoke an object privilege that was granted by way of a `WITH` `GRANT` `OPTION` grant.
+
+The `REVOKE` statement can revoke only privileges and roles that were previously granted directly with a `GRANT` statement. You cannot use this statement to revoke:
+
+* Privileges or roles not granted to the revokee
+* Roles or object privileges granted through the operating system
+* Privileges or roles granted to the revokee through roles
+
+Semantics
+
+revoke\_system\_privileges
+
+Use these clauses to revoke system privileges.
+
+system\_privilege
+
+Specify the system privilege to be revoked. Refer to [Table 18-1](statements_9013.md#BABEFFEE) for a list of the system privileges.
+
+If you revoke a system privilege from a user, then the database removes the privilege from the user's privilege domain. Effective immediately, the user cannot exercise the privilege.
+
+If you revoke a system privilege from a role, then the database removes the privilege from the privilege domain of the role. Effective immediately, users with the role enabled cannot exercise the privilege. Also, other users who have been granted the role and subsequently enable the role cannot exercise the privilege.
+
+If you revoke a system privilege from `PUBLIC`, then the database removes the privilege from the privilege domain of each user who has been granted the privilege through `PUBLIC`. Effective immediately, such users can no longer exercise the privilege. However, the privilege is not revoked from users who have been granted the privilege directly or through roles.
+
+Oracle Database provides a shortcut for specifying all system privileges at once: Specify `ALL` `PRIVILEGES` to revoke all the system privileges listed in [Table 18-1](statements_9013.md#BABEFFEE).
+
+Restriction on Revoking System Privileges A system privilege cannot appear more than once in the list of privileges to be revoked.
+
+role
+
+Specify the role to be revoked.
+
+If you revoke a role from a user, then the database makes the role unavailable to the user. If the role is currently enabled for the user, then the user can continue to exercise the privileges in the role's privilege domain as long as it remains enabled. However, the user cannot subsequently enable the role.
+
+If you revoke a role from another role, then the database removes the privilege domain of the revoked role from the privilege domain of the revokee role. Users who have been granted and have enabled the revokee role can continue to exercise the privileges in the privilege domain of the revoked role as long as the revokee role remains enabled. However, other users who have been granted the revokee role and subsequently enable it cannot exercise the privileges in the privilege domain of the revoked role.
+
+If you revoke a role from `PUBLIC`, then the database makes the role unavailable to all users who have been granted the role through `PUBLIC`. Any user who has enabled the role can continue to exercise the privileges in its privilege domain as long as it remains enabled. However, users cannot subsequently enable the role. The role is not revoked from users who have been granted the role directly or through other roles.
+
+Restriction on Revoking System Roles A system role cannot appear more than once in the list of roles to be revoked. For information on the predefined roles, refer to [Oracle Database Security Guide](../../network.112/e36292/authorization.md#DBSEG4414).
+
+grantee\_clause
+
+`FROM` `grantee_clause` identifies users or roles from which the system privilege, role, or object privilege is to be revoked.
+
+PUBLIC Specify `PUBLIC` to revoke the privileges or roles from all users.
+
+revoke\_object\_privileges
+
+Use these clauses to revoke object privileges.
+
+object\_privilege
+
+Specify the object privilege to be revoked. You can substitute any of the object privileges described on [Table 18-2](statements_9013.md#BGBCIIEG).
+
+Note:
+
+Each privilege authorizes some operation. By revoking a privilege, you prevent the revokee from performing that operation. However, multiple users may grant the same privilege to the same user, role, or
+
+`PUBLIC`
+
+. To remove the privilege from the grantee's privilege domain, all grantors must revoke the privilege. If even one grantor does not revoke the privilege, then the grantee can still exercise the privilege by virtue of that grant.
+
+If you revoke an object privilege from a user, then the database removes the privilege from the user's privilege domain. Effective immediately, the user cannot exercise the privilege.
+
+* If that user has granted that privilege to other users or roles, then the database also revokes the privilege from those other users or roles.
+* If that user's schema contains a procedure, function, or package that contains SQL statements that exercise the privilege, then the procedure, function, or package can no longer be executed.
+* If that user's schema contains a view on that object, then the database invalidates the view.
+* If you revoke the `REFERENCES` object privilege from a user who has exercised the privilege to define referential integrity constraints, then you must specify the `CASCADE` `CONSTRAINTS` clause.
+
+If you revoke an object privilege from a role, then the database removes the privilege from the privilege domain of the role. Effective immediately, users with the role enabled cannot exercise the privilege. Other users who have been granted the role cannot exercise the privilege after enabling the role.
+
+If you revoke an object privilege from `PUBLIC`, then the database removes the privilege from the privilege domain of each user who has been granted the privilege through `PUBLIC`. Effective immediately, all such users are restricted from exercising the privilege. However, the privilege is not revoked from users who have been granted the privilege directly or through roles.
+
+ALL [PRIVILEGES]
+
+Specify `ALL` to revoke all object privileges that you have granted to the revokee. (The keyword `PRIVILEGES` is provided for semantic clarity and is optional.)
+
+If no privileges have been granted on the object, then the database takes no action and does not return an error.
+
+Restriction on Revoking Object Privileges A privilege cannot appear more than once in the list of privileges to be revoked. A user, a role, or `PUBLIC` cannot appear more than once in the `FROM` clause.
+
+CASCADE CONSTRAINTS
+
+This clause is relevant only if you revoke the `REFERENCES` privilege or `ALL` [`PRIVILEGES`]. It drops any referential integrity constraints that the revokee has defined using the `REFERENCES` privilege, which might have been granted either explicitly or implicitly through a grant of `ALL` [`PRIVILEGES`].
+
+FORCE
+
+Specify `FORCE` to revoke the `EXECUTE` object privilege on user-defined type objects with table or type dependencies. You must use `FORCE` to revoke the `EXECUTE` object privilege on user-defined type objects with table dependencies.
+
+If you specify `FORCE`, then all privileges are revoked, all dependent objects are marked `INVALID`, data in dependent tables becomes inaccessible, and all dependent function-based indexes are marked `UNUSABLE`. Regranting the necessary type privilege will revalidate the table.
+
+on\_object\_clause
+
+The `on_object_clause` identifies the objects on which privileges are to be revoked.
+
+object  Specify the object on which the object privileges are to be revoked. This object can be:
+
+* A table, view, sequence, procedure, stored function, package, or materialized view
+* A synonym for a table, view, sequence, procedure, stored function, package, materialized view, or user-defined type
+* A library, indextype, or user-defined operator
+
+If you do not qualify object with `schema`, then the database assumes the object is in your own schema.
+
+If you revoke the `SELECT` object privilege on the containing table or materialized view of a materialized view, whether the privilege was granted with or without the `GRANT` `OPTION`, then the database invalidates the materialized view.
+
+If you revoke the `SELECT` object privilege on any of the master tables of a materialized view, whether the privilege was granted with or without the `GRANT` `OPTION`, then the database invalidates both the materialized view and its containing table or materialized view.
+
+DIRECTORY directory\_name Specify the directory object on which privileges are to be revoked. You cannot qualify `directory_name` with `schema`. The object must be a directory.
+
+EDITION Specify the name of the edition on which the `USE` object privilege is to be revoked. You cannot qualify `edition_name` with `schema`.
+
+JAVA SOURCE | RESOURCE The `JAVA` clause lets you specify a Java source or resource schema object on which privileges are to be revoked.
+
+Examples
+
+Revoking a System Privilege from a User: Example The following statement revokes the `DROP` `ANY` `TABLE` system privilege from the users `hr` and `oe`:
+
+```
+REVOKE DROP ANY TABLE 
+    FROM hr, oe;
+```
+
+The users `hr` and `oe` can no longer drop tables in schemas other than their own.
+
+Revoking a Role from a User: Example The following statement revokes the role `dw_manager` from the user `sh`:
+
+```
+REVOKE dw_manager 
+    FROM sh;
+```
+
+The user `sh` can no longer enable the `dw_manager` role.
+
+Revoking a System Privilege from a Role: Example The following statement revokes the `CREATE` `TABLESPACE` system privilege from the `dw_manager` role:
+
+```
+REVOKE CREATE TABLESPACE 
+   FROM dw_manager;
+```
+
+Enabling the `dw_manager` role no longer allows users to create tablespaces.
+
+Revoking a Role from a Role: Example To revoke the role `dw_user` from the role `dw_manager`, issue the following statement:
+
+```
+REVOKE dw_user
+  FROM dw_manager;
+```
+
+The `dw_user` role privileges are no longer granted to `dw_manager`.
+
+Revoking an Object Privilege from a User: Example You can grant `DELETE`, `INSERT`, `SELECT`, and `UPDATE` privileges on the table `orders` to the user `hr` with the following statement:
+
+```
+GRANT ALL 
+   ON orders TO hr;
+```
+
+To revoke the `DELETE` privilege on `orders` from `hr`, issue the following statement:
+
+```
+REVOKE DELETE 
+   ON orders FROM hr;
+```
+
+Revoking All Object Privileges from a User: Example To revoke the remaining privileges on `orders` that you granted to `hr`, issue the following statement:
+
+```
+REVOKE ALL 
+   ON orders FROM hr;
+```
+
+Revoking Object Privileges from PUBLIC: Example You can grant `SELECT` and `UPDATE` privileges on the view `emp_details_view` to all users by granting the privileges to the role `PUBLIC`:
+
+```
+GRANT SELECT, UPDATE 
+    ON emp_details_view TO public;
+```
+
+The following statement revokes `UPDATE` privilege on `emp_details_view` from all users:
+
+```
+REVOKE UPDATE 
+    ON emp_details_view FROM public;
+```
+
+Users can no longer update the `emp_details_view` view, although users can still query it. However, if you have also granted the `UPDATE` privilege on `emp_details_view` to any users, either directly or through roles, then these users retain the privilege.
+
+Revoking an Object Privilege on a Sequence from a User: Example You can grant the user `oe` the `SELECT` privilege on the `departments_seq` sequence in the schema `hr` with the following statement:
+
+```
+GRANT SELECT 
+    ON hr.departments_seq TO oe;
+```
+
+To revoke the `SELECT` privilege on `departments_seq` from `oe`, issue the following statement:
+
+```
+REVOKE SELECT 
+    ON hr.departments_seq FROM oe;
+```
+
+However, if the user `hr` has also granted `SELECT` privilege on `departments` to `sh`, then `sh` can still use `departments` by virtue of `hr`'s grant.
+
+Revoking an Object Privilege with CASCADE CONSTRAINTS: Example You can grant to `oe` the privileges `REFERENCES` and `UPDATE` on the `employees` table in the schema `hr` with the following statement:
+
+```
+GRANT REFERENCES, UPDATE 
+    ON hr.employees TO oe;
+```
+
+The user `oe` can exercise the `REFERENCES` privilege to define a constraint in his or her own `dependent` table that refers to the `employees` table in the schema `hr`:
+
+```
+CREATE TABLE dependent 
+(dependno   NUMBER, 
+ dependname VARCHAR2(10), 
+ employee   NUMBER                   
+    CONSTRAINT in_emp REFERENCES hr.employees(employee_id) );
+```
+
+You can revoke the `REFERENCES` privilege on `hr.employees` from `oe` by issuing the following statement that contains the `CASCADE` `CONSTRAINTS` clause:
+
+```
+REVOKE REFERENCES 
+    ON hr.employees 
+    FROM oe 
+    CASCADE CONSTRAINTS;
+```
+
+Revoking `oe`'s `REFERENCES` privilege on `hr.employees` causes Oracle Database to drop the `in_emp` constraint, because `oe` required the privilege to define the constraint.
+
+However, if `oe` has also been granted the `REFERENCES` privilege on `hr.employees` by a user other than you, then the database does not drop the constraint. `oe` still has the privilege necessary for the constraint by virtue of the other user's grant.
+
+Revoking an Object Privilege on a Directory from a User: Example You can revoke the `READ` object privilege on directory `bfile_dir` from `hr` by issuing the following statement:
+
+```
+REVOKE READ ON DIRECTORY bfile_dir FROM hr;
+```
+
+Revoke Operations that Use GRANT ANY OBJECT PRIVILEGE: Example Suppose that the database administrator has granted `GRANT` `ANY` `OBJECT` `PRIVILEGE` to user `sh`. Now suppose that user `hr` grants the update privilege on the `employees` table to `oe`:
+
+```
+CONNECT hr
+GRANT UPDATE ON employees TO oe WITH GRANT OPTION;
+```
+
+This grant gives user `oe` the right to pass the object privilege along to another user:
+
+```
+CONNECT oe
+GRANT UPDATE ON hr.employees TO pm;
+```
+
+User `sh`, who has the `GRANT` `ANY` `OBJECT` `PRIVILEGE`, can now act on behalf of user `hr` and revoke the update privilege from user `oe`, because `oe` was granted the privilege by `hr`:
+
+```
+CONNECT sh
+REVOKE UPDATE ON hr.employees FROM oe;
+```
+
+User `sh` cannot revoke the update privilege from user `pm` explicitly, because `pm` received the grant neither from the object owner (`hr`), nor from `sh`, nor from another user with `GRANT` `ANY` `OBJECT` `PRIVILEGE`, but from user `oe`. However, the preceding statement cascades, removing all privileges that depend on the one revoked. Therefore the object privilege is implicitly revoked from `pm` as well.

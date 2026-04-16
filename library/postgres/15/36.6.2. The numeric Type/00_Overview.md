@@ -1,0 +1,223 @@
+---
+source: PostgreSQL 15 Reference
+title: 00_Overview
+---
+
+The numeric type offers to do calculations with arbitrary precision. See Section 8.1 for the equivalent type in the PostgreSQL server. Because of the arbitrary precision this variable needs to be able to expand and shrink dynamically. That's why you can only create numeric variables on the heap, by means of the PGTYPESnumeric\_new and PGTYPESnumeric\_free functions. The decimal type, which is similar but limited in precision, can be created on the stack as well as on the heap.
+
+The following functions can be used to work with the numeric type:
+
+```
+PGTYPESnumeric_new
+```
+
+Request a pointer to a newly allocated numeric variable.
+
+```
+numeric *PGTYPESnumeric_new(void);
+PGTYPESnumeric_free
+```
+
+Free a numeric type, release all of its memory.
+
+```
+void PGTYPESnumeric_free(numeric *var);
+PGTYPESnumeric_from_asc
+```
+
+Parse a numeric type from its string notation.
+
+```
+numeric *PGTYPESnumeric_from_asc(char *str, char **endptr);
+```
+
+Valid formats are for example: -2, .794, +3.44, 592.49E07 or -32.84e-4. If the value could be parsed successfully, a valid pointer is returned, else the NULL pointer. At the moment ECPG always parses the complete string and so it currently does not support to store the address of the first invalid character in \*endptr. You can safely set endptr to NULL.
+
+```
+PGTYPESnumeric_to_asc
+```
+
+Returns a pointer to a string allocated by malloc that contains the string representation of the numeric type num.
+
+```
+char *PGTYPESnumeric_to_asc(numeric *num, int dscale);
+```
+
+The numeric value will be printed with dscale decimal digits, with rounding applied if necessary. The result must be freed with PGTYPESchar\_free().
+
+```
+PGTYPESnumeric_add
+```
+
+Add two numeric variables into a third one.
+
+```
+int PGTYPESnumeric_add(numeric *var1, numeric *var2, numeric
+ *result);
+```
+
+The function adds the variables var1 and var2 into the result variable result. The function returns 0 on success and -1 in case of error.
+
+```
+PGTYPESnumeric_sub
+```
+
+Subtract two numeric variables and return the result in a third one.
+
+```
+int PGTYPESnumeric_sub(numeric *var1, numeric *var2, numeric
+ *result);
+```
+
+The function subtracts the variable var2 from the variable var1. The result of the operation is stored in the variable result. The function returns 0 on success and -1 in case of error.
+
+```
+PGTYPESnumeric_mul
+```
+
+Multiply two numeric variables and return the result in a third one.
+
+```
+int PGTYPESnumeric_mul(numeric *var1, numeric *var2, numeric
+ *result);
+```
+
+The function multiplies the variables var1 and var2. The result of the operation is stored in the variable result. The function returns 0 on success and -1 in case of error.
+
+```
+PGTYPESnumeric_div
+```
+
+Divide two numeric variables and return the result in a third one.
+
+```
+int PGTYPESnumeric_div(numeric *var1, numeric *var2, numeric
+ *result);
+```
+
+The function divides the variables var1 by var2. The result of the operation is stored in the variable result. The function returns 0 on success and -1 in case of error.
+
+```
+PGTYPESnumeric_cmp
+```
+
+Compare two numeric variables.
+
+```
+int PGTYPESnumeric_cmp(numeric *var1, numeric *var2)
+```
+
+This function compares two numeric variables. In case of error, INT\_MAX is returned. On success, the function returns one of three possible results:
+
+- 1, if var1 is bigger than var2
+- -1, if var1 is smaller than var2
+- 0, if var1 and var2 are equal
+
+```
+PGTYPESnumeric_from_int
+```
+
+Convert an int variable to a numeric variable.
+
+```
+int PGTYPESnumeric_from_int(signed int int_val, numeric *var);
+```
+
+This function accepts a variable of type signed int and stores it in the numeric variable var. Upon success, 0 is returned and -1 in case of a failure.
+
+```
+PGTYPESnumeric_from_long
+```
+
+Convert a long int variable to a numeric variable.
+
+```
+int PGTYPESnumeric_from_long(signed long int long_val, numeric
+ *var);
+```
+
+This function accepts a variable of type signed long int and stores it in the numeric variable var. Upon success, 0 is returned and -1 in case of a failure.
+
+```
+PGTYPESnumeric_copy
+```
+
+Copy over one numeric variable into another one.
+
+```
+int PGTYPESnumeric_copy(numeric *src, numeric *dst);
+```
+
+This function copies over the value of the variable that src points to into the variable that dst points to. It returns 0 on success and -1 if an error occurs.
+
+```
+PGTYPESnumeric_from_double
+```
+
+Convert a variable of type double to a numeric.
+
+```
+int PGTYPESnumeric_from_double(double d, numeric *dst);
+```
+
+This function accepts a variable of type double and stores the result in the variable that dst points to. It returns 0 on success and -1 if an error occurs.
+
+```
+PGTYPESnumeric_to_double
+```
+
+Convert a variable of type numeric to double.
+
+```
+int PGTYPESnumeric_to_double(numeric *nv, double *dp)
+```
+
+The function converts the numeric value from the variable that nv points to into the double variable that dp points to. It returns 0 on success and -1 if an error occurs, including overflow. On overflow, the global variable errno will be set to PGTYPES\_NUM\_OVERFLOW additionally.
+
+```
+PGTYPESnumeric_to_int
+```
+
+Convert a variable of type numeric to int.
+
+```
+int PGTYPESnumeric_to_int(numeric *nv, int *ip);
+```
+
+The function converts the numeric value from the variable that nv points to into the integer variable that ip points to. It returns 0 on success and -1 if an error occurs, including overflow. On overflow, the global variable errno will be set to PGTYPES\_NUM\_OVERFLOW additionally.
+
+```
+PGTYPESnumeric_to_long
+```
+
+Convert a variable of type numeric to long.
+
+```
+int PGTYPESnumeric_to_long(numeric *nv, long *lp);
+```
+
+The function converts the numeric value from the variable that nv points to into the long integer variable that lp points to. It returns 0 on success and -1 if an error occurs, including overflow. On overflow, the global variable errno will be set to PGTYPES\_NUM\_OVERFLOW additionally.
+
+```
+PGTYPESnumeric_to_decimal
+```
+
+Convert a variable of type numeric to decimal.
+
+```
+int PGTYPESnumeric_to_decimal(numeric *src, decimal *dst);
+```
+
+The function converts the numeric value from the variable that src points to into the decimal variable that dst points to. It returns 0 on success and -1 if an error occurs, including overflow. On overflow, the global variable errno will be set to PGTYPES\_NUM\_OVERFLOW additionally.
+
+```
+PGTYPESnumeric_from_decimal
+```
+
+Convert a variable of type decimal to numeric.
+
+```
+int PGTYPESnumeric_from_decimal(decimal *src, numeric *dst);
+```
+
+The function converts the decimal value from the variable that src points to into the numeric variable that dst points to. It returns 0 on success and -1 if an error occurs. Since the decimal type is implemented as a limited version of the numeric type, overflow cannot occur with this conversion.

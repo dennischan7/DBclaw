@@ -1,0 +1,266 @@
+---
+source: PostgreSQL 14 Reference
+title: 00_Overview
+---
+
+A collation is an SQL schema object that maps an SQL name to locales provided by libraries installed in the operating system. A collation definition has a *provider* that specifies which library supplies the locale data. One standard provider name is libc, which uses the locales provided by the operating system C library. These are the locales that most tools provided by the operating system use. Another provider is icu, which uses the external ICU library. ICU locales can only be used if support for ICU was configured when PostgreSQL was built.
+
+A collation object provided by libc maps to a combination of LC\_COLLATE and LC\_CTYPE settings, as accepted by the setlocale() system library call. (As the name would suggest, the main purpose of a collation is to set LC\_COLLATE, which controls the sort order. But it is rarely necessary in practice to have an LC\_CTYPE setting that is different from LC\_COLLATE, so it is more convenient to collect these under one concept than to create another infrastructure for setting LC\_CTYPE per expression.) Also, a libc collation is tied to a character set encoding (see [Section 24.3](#page-140-0)). The same collation name may exist for different encodings.
+
+A collation object provided by icu maps to a named collator provided by the ICU library. ICU does not support separate "collate" and "ctype" settings, so they are always the same. Also, ICU collations are independent of the encoding, so there is always only one ICU collation of a given name in a database.
+
+### **24.2.2.1. Standard Collations**
+
+On all platforms, the collations named default, C, and POSIX are available. Additional collations may be available depending on operating system support. The default collation selects the LC\_COLLATE and LC\_CTYPE values specified at database creation time. The C and POSIX collations both specify "traditional C" behavior, in which only the ASCII letters "A" through "Z" are treated as letters, and sorting is done strictly by character code byte values.
+
+Additionally, the SQL standard collation name ucs\_basic is available for encoding UTF8. It is equivalent to C and sorts by Unicode code point.
+
+### **24.2.2.2. Predefined Collations**
+
+If the operating system provides support for using multiple locales within a single program (newlocale and related functions), or if support for ICU is configured, then when a database cluster is initialized, initdb populates the system catalog pg\_collation with collations based on all the locales it finds in the operating system at the time.
+
+To inspect the currently available locales, use the query SELECT \* FROM pg\_collation, or the command \dOS+ in psql.
+
+### **24.2.2.2.1. libc Collations**
+
+For example, the operating system might provide a locale named de\_DE.utf8. initdb would then create a collation named de\_DE.utf8 for encoding UTF8 that has both LC\_COLLATE and LC\_CTYPE set to de\_DE.utf8. It will also create a collation with the .utf8 tag stripped off the name. So you could also use the collation under the name de\_DE, which is less cumbersome to write and makes the name less encoding-dependent. Note that, nevertheless, the initial set of collation names is platform-dependent.
+
+The default set of collations provided by libc map directly to the locales installed in the operating system, which can be listed using the command locale -a. In case a libc collation is needed that has different values for LC\_COLLATE and LC\_CTYPE, or if new locales are installed in the operating system after the database system was initialized, then a new collation may be created using the CREATE COLLATION command. New operating system locales can also be imported en masse using the pg\_import\_system\_collations() function.
+
+Within any particular database, only collations that use that database's encoding are of interest. Other entries in pg\_collation are ignored. Thus, a stripped collation name such as de\_DE can be considered unique within a given database even though it would not be unique globally. Use of the stripped collation names is recommended, since it will make one fewer thing you need to change if you decide to change to another database encoding. Note however that the default, C, and POSIX collations can be used regardless of the database encoding.
+
+PostgreSQL considers distinct collation objects to be incompatible even when they have identical properties. Thus for example,
+
+```
+SELECT a COLLATE "C" < b COLLATE "POSIX" FROM test1;
+```
+
+will draw an error even though the C and POSIX collations have identical behaviors. Mixing stripped and non-stripped collation names is therefore not recommended.
+
+#### **24.2.2.2.2. ICU Collations**
+
+With ICU, it is not sensible to enumerate all possible locale names. ICU uses a particular naming system for locales, but there are many more ways to name a locale than there are actually distinct locales. initdb uses the ICU APIs to extract a set of distinct locales to populate the initial set of collations. Collations provided by ICU are created in the SQL environment with names in BCP 47 language tag format, with a "private use" extension -x-icu appended, to distinguish them from libc locales.
+
+Here are some example collations that might be created:
+
+```
+de-x-icu
+```
+
+German collation, default variant
+
+```
+de-AT-x-icu
+```
+
+German collation for Austria, default variant
+
+(There are also, say, de-DE-x-icu or de-CH-x-icu, but as of this writing, they are equivalent to de-x-icu.)
+
+```
+und-x-icu (for "undefined")
+```
+
+ICU "root" collation. Use this to get a reasonable language-agnostic sort order.
+
+Some (less frequently used) encodings are not supported by ICU. When the database encoding is one of these, ICU collation entries in pg\_collation are ignored. Attempting to use one will draw an error along the lines of "collation "de-x-icu" for encoding "WIN874" does not exist".
+
+### **24.2.2.3. Creating New Collation Objects**
+
+If the standard and predefined collations are not sufficient, users can create their own collation objects using the SQL command CREATE COLLATION.
+
+The standard and predefined collations are in the schema pg\_catalog, like all predefined objects. User-defined collations should be created in user schemas. This also ensures that they are saved by pg\_dump.
+
+#### **24.2.2.3.1. libc Collations**
+
+New libc collations can be created like this:
+
+```
+CREATE COLLATION german (provider = libc, locale = 'de_DE');
+```
+
+The exact values that are acceptable for the locale clause in this command depend on the operating system. On Unix-like systems, the command locale -a will show a list.
+
+Since the predefined libc collations already include all collations defined in the operating system when the database instance is initialized, it is not often necessary to manually create new ones. Reasons might be if a different naming system is desired (in which case see also [Section 24.2.2.3.3](#page-139-0)) or if the operating system has been upgraded to provide new locale definitions (in which case see also pg\_import\_system\_collations()).
+
+### **24.2.2.3.2. ICU Collations**
+
+ICU allows collations to be customized beyond the basic language+country set that is preloaded by initdb. Users are encouraged to define their own collation objects that make use of these facilities to suit the sorting behavior to their requirements. See [https://unicode-org.github.io/icu/userguide/lo](https://unicode-org.github.io/icu/userguide/locale/)[cale/](https://unicode-org.github.io/icu/userguide/locale/) and <https://unicode-org.github.io/icu/userguide/collation/api.html> for information on ICU locale naming. The set of acceptable names and attributes depends on the particular ICU version.
+
+Here are some examples:
+
+```
+CREATE COLLATION "de-u-co-phonebk-x-icu" (provider = icu, locale =
+'de-u-co-phonebk');
+CREATE COLLATION "de-u-co-phonebk-x-icu" (provider = icu, locale =
+'de@collation=phonebook');
+```
+
+German collation with phone book collation type
+
+The first example selects the ICU locale using a "language tag" per BCP 47. The second example uses the traditional ICU-specific locale syntax. The first style is preferred going forward, but it is not supported by older ICU versions.
+
+Note that you can name the collation objects in the SQL environment anything you want. In this example, we follow the naming style that the predefined collations use, which in turn also follow BCP 47, but that is not required for user-defined collations.
+
+```
+CREATE COLLATION "und-u-co-emoji-x-icu" (provider = icu, locale =
+'und-u-co-emoji');
+CREATE COLLATION "und-u-co-emoji-x-icu" (provider = icu, locale =
+'@collation=emoji');
+```
+
+Root collation with Emoji collation type, per Unicode Technical Standard #51
+
+Observe how in the traditional ICU locale naming system, the root locale is selected by an empty string.
+
+```
+CREATE COLLATION latinlast (provider = icu, locale = 'en-u-kr-grek-
+latn');
+CREATE COLLATION latinlast (provider = icu, locale = 'en@colRe-
+order=grek-latn');
+```
+
+Sort Greek letters before Latin ones. (The default is Latin before Greek.)
+
+```
+CREATE COLLATION upperfirst (provider = icu, locale = 'en-u-kf-up-per');
+CREATE COLLATION upperfirst (provider = icu, locale = 'en@colCase-First=upper');
+```
+
+Sort upper-case letters before lower-case letters. (The default is lower-case letters first.)
+
+```
+CREATE COLLATION special (provider = icu, locale = 'en-u-kf-upper-kr-
+grek-latn');
+CREATE COLLATION special (provider = icu, locale = 'en@colCase-
+First=upper;colReorder=grek-latn');
+```
+
+Combines both of the above options.
+
+```
+CREATE COLLATION numeric (provider = icu, locale = 'en-u-kn-true');
+CREATE COLLATION numeric (provider = icu, locale = 'en@colNumer-ic=yes');
+```
+
+Numeric ordering, sorts sequences of digits by their numeric value, for example:  $A-21 \le A-123$  (also known as natural sort).
+
+See Unicode Technical Standard # $35^1$  and BCP  $47^2$  for details. The list of possible collation types (co subtag) can be found in the CLDR repository<sup>3</sup>.
+
+Note that while this system allows creating collations that "ignore case" or "ignore accents" or similar (using the ks key), in order for such collations to act in a truly case- or accent-insensitive manner, they also need to be declared as not *deterministic* in CREATE COLLATION; see Section 24.2.2.4. Otherwise, any strings that compare equal according to the collation but are not byte-wise equal will be sorted according to their byte values.
+
+#### Note
+
+By design, ICU will accept almost any string as a locale name and match it to the closest locale it can provide, using the fallback procedure described in its documentation. Thus, there will be no direct feedback if a collation specification is composed using features that the given ICU installation does not actually support. It is therefore recommended to create application-level test cases to check that the collation definitions satisfy one's requirements.
+
+#### <span id="page-139-0"></span>24.2.2.3.3. Copying Collations
+
+The command CREATE COLLATION can also be used to create a new collation from an existing collation, which can be useful to be able to use operating-system-independent collation names in applications, create compatibility names, or use an ICU-provided collation under a more readable name. For example:
+
+```
+CREATE COLLATION german FROM "de_DE";
+CREATE COLLATION french FROM "fr-x-icu";
+```
+
+<sup>&</sup>lt;sup>1</sup> https://www.unicode.org/reports/tr35/tr35-collation.html
+
+<sup>&</sup>lt;sup>2</sup> https://www.rfc-editor.org/info/bcp47
+
+<sup>&</sup>lt;sup>3</sup> https://github.com/unicode-org/cldr/blob/master/common/bcp47/collation.xml
+
+### <span id="page-140-1"></span>**24.2.2.4. Nondeterministic Collations**
+
+A collation is either *deterministic* or *nondeterministic*. A deterministic collation uses deterministic comparisons, which means that it considers strings to be equal only if they consist of the same byte sequence. Nondeterministic comparison may determine strings to be equal even if they consist of different bytes. Typical situations include case-insensitive comparison, accent-insensitive comparison, as well as comparison of strings in different Unicode normal forms. It is up to the collation provider to actually implement such insensitive comparisons; the deterministic flag only determines whether ties are to be broken using bytewise comparison. See also [Unicode Technical Standard 10](https://www.unicode.org/reports/tr10)<sup>4</sup> for more information on the terminology.
+
+To create a nondeterministic collation, specify the property deterministic = false to CREATE COLLATION, for example:
+
+```
+CREATE COLLATION ndcoll (provider = icu, locale = 'und',
+ deterministic = false);
+```
+
+This example would use the standard Unicode collation in a nondeterministic way. In particular, this would allow strings in different normal forms to be compared correctly. More interesting examples make use of the ICU customization facilities explained above. For example:
+
+```
+CREATE COLLATION case_insensitive (provider = icu, locale = 'und-u-
+ks-level2', deterministic = false);
+CREATE COLLATION ignore_accents (provider = icu, locale = 'und-u-
+ks-level1-kc-true', deterministic = false);
+```
+
+All standard and predefined collations are deterministic, all user-defined collations are deterministic by default. While nondeterministic collations give a more "correct" behavior, especially when considering the full power of Unicode and its many special cases, they also have some drawbacks. Foremost, their use leads to a performance penalty. Note, in particular, that B-tree cannot use deduplication with indexes that use a nondeterministic collation. Also, certain operations are not possible with nondeterministic collations, such as pattern matching operations. Therefore, they should be used only in cases where they are specifically wanted.
+
+### **Tip**
+
+To deal with text in different Unicode normalization forms, it is also an option to use the functions/expressions normalize and is normalized to preprocess or check the strings, instead of using nondeterministic collations. There are different trade-offs for each approach.
+
+# <span id="page-140-0"></span>**24.3. Character Set Support**
+
+The character set support in PostgreSQL allows you to store text in a variety of character sets (also called encodings), including single-byte character sets such as the ISO 8859 series and multiple-byte character sets such as EUC (Extended Unix Code), UTF-8, and Mule internal code. All supported character sets can be used transparently by clients, but a few are not supported for use within the server (that is, as a server-side encoding). The default character set is selected while initializing your PostgreSQL database cluster using initdb. It can be overridden when you create a database, so you can have multiple databases each with a different character set.
+
+An important restriction, however, is that each database's character set must be compatible with the database's LC\_CTYPE (character classification) and LC\_COLLATE (string sort order) locale settings. For C or POSIX locale, any character set is allowed, but for other libc-provided locales there is only
+
+<sup>4</sup> <https://www.unicode.org/reports/tr10>
+
+one character set that will work correctly. (On Windows, however, UTF-8 encoding can be used with any locale.) If you have ICU support configured, ICU-provided locales can be used with most but not all server-side encodings.
+
+## <span id="page-141-1"></span><span id="page-141-0"></span>**24.3.1. Supported Character Sets**
+
+[Table 24.1](#page-141-1) shows the character sets available for use in PostgreSQL.
+
+**Table 24.1. PostgreSQL Character Sets**
+
+| Name         | Description                             | Language                              | Server? | ICU? | Bytes/<br>Char | Aliases               |
+|--------------|-----------------------------------------|---------------------------------------|---------|------|----------------|-----------------------|
+| BIG5         | Big Five                                | Traditional<br>Chinese                | No      | No   | 1–2            | WIN950,<br>Windows950 |
+| EUC_CN       | Extended<br>UNIX Code<br>CN             | Simplified<br>Chinese                 | Yes     | Yes  | 1–3            |                       |
+| EUC_JP       | Extended<br>UNIX Code<br>JP             | Japanese                              | Yes     | Yes  | 1–3            |                       |
+| EUC_JIS_2004 | Extended<br>UNIX Code<br>JP, JIS X 0213 | Japanese                              | Yes     | No   | 1–3            |                       |
+| EUC_KR       | Extended<br>UNIX Code<br>KR             | Korean                                | Yes     | Yes  | 1–3            |                       |
+| EUC_TW       | Extended<br>UNIX Code<br>TW             | Traditional<br>Chinese, Tai<br>wanese | Yes     | Yes  | 1–4            |                       |
+| GB18030      | National Stan<br>dard                   | Chinese                               | No      | No   | 1–4            |                       |
+| GBK          | Extended Na<br>tional Standard          | Simplified<br>Chinese                 | No      | No   | 1–2            | WIN936,<br>Windows936 |
+| ISO_8859_5   | ISO 8859-5,<br>ECMA 113                 | Latin/Cyrillic                        | Yes     | Yes  | 1              |                       |
+| ISO_8859_6   | ISO 8859-6,<br>ECMA 114                 | Latin/Arabic                          | Yes     | Yes  | 1              |                       |
+| ISO_8859_7   | ISO 8859-7,<br>ECMA 118                 | Latin/Greek                           | Yes     | Yes  | 1              |                       |
+| ISO_8859_8   | ISO 8859-8,<br>ECMA 121                 | Latin/Hebrew                          | Yes     | Yes  | 1              |                       |
+| JOHAB        | JOHAB                                   | Korean<br>(Hangul)                    | No      | No   | 1–3            |                       |
+| KOI8R        | KOI8-R                                  | Cyrillic (Russ<br>ian)                | Yes     | Yes  | 1              | KOI8                  |
+| KOI8U        | KOI8-U                                  | Cyrillic<br>(Ukrainian)               | Yes     | Yes  | 1              |                       |
+| LATIN1       | ISO 8859-1,<br>ECMA 94                  | Western Euro<br>pean                  | Yes     | Yes  | 1              | ISO88591              |
+| LATIN2       | ISO 8859-2,<br>ECMA 94                  | Central Euro<br>pean                  | Yes     | Yes  | 1              | ISO88592              |
+
+| Name           | Description                      | Language                            | Server? | ICU? | Bytes/<br>Char | Aliases                                        |
+|----------------|----------------------------------|-------------------------------------|---------|------|----------------|------------------------------------------------|
+| LATIN3         | ISO 8859-3,<br>ECMA 94           | South Euro<br>pean                  | Yes     | Yes  | 1              | ISO88593                                       |
+| LATIN4         | ISO 8859-4,<br>ECMA 94           | North Euro<br>pean                  | Yes     | Yes  | 1              | ISO88594                                       |
+| LATIN5         | ISO 8859-9,<br>ECMA 128          | Turkish                             | Yes     | Yes  | 1              | ISO88599                                       |
+| LATIN6         | ISO 8859-10,<br>ECMA 144         | Nordic                              | Yes     | Yes  | 1              | ISO885910                                      |
+| LATIN7         | ISO 8859-13                      | Baltic                              | Yes     | Yes  | 1              | ISO885913                                      |
+| LATIN8         | ISO 8859-14                      | Celtic                              | Yes     | Yes  | 1              | ISO885914                                      |
+| LATIN9         | ISO 8859-15                      | LATIN1 with<br>Euro and ac<br>cents | Yes     | Yes  | 1              | ISO885915                                      |
+| LATIN10        | ISO 8859-16,<br>ASRO SR<br>14111 | Romanian                            | Yes     | No   | 1              | ISO885916                                      |
+| MULE_INTERNAL  | Mule internal<br>code            | Multilingual<br>Emacs               | Yes     | No   | 1–4            |                                                |
+| SJIS           | Shift JIS                        | Japanese                            | No      | No   | 1–2            | Mskanji,<br>ShiftJIS,<br>WIN932,<br>Windows932 |
+| SHIFT_JIS_2004 | Shift JIS, JIS<br>X 0213         | Japanese                            | No      | No   | 1–2            |                                                |
+| SQL_ASCII      | unspecified<br>(see text)        | any                                 | Yes     | No   | 1              |                                                |
+| UHC            | Unified<br>Hangul Code           | Korean                              | No      | No   | 1–2            | WIN949,<br>Windows949                          |
+| UTF8           | Unicode, 8-bit                   | all                                 | Yes     | Yes  | 1–4            | Unicode                                        |
+| WIN866         | Windows<br>CP866                 | Cyrillic                            | Yes     | Yes  | 1              | ALT                                            |
+| WIN874         | Windows<br>CP874                 | Thai                                | Yes     | No   | 1              |                                                |
+| WIN1250        | Windows<br>CP1250                | Central Euro<br>pean                | Yes     | Yes  | 1              |                                                |
+| WIN1251        | Windows<br>CP1251                | Cyrillic                            | Yes     | Yes  | 1              | WIN                                            |
+| WIN1252        | Windows<br>CP1252                | Western Euro<br>pean                | Yes     | Yes  | 1              |                                                |
+| WIN1253        | Windows<br>CP1253                | Greek                               | Yes     | Yes  | 1              |                                                |
+| WIN1254        | Windows<br>CP1254                | Turkish                             | Yes     | Yes  | 1              |                                                |
+| WIN1255        | Windows<br>CP1255                | Hebrew                              | Yes     | Yes  | 1              |                                                |
+| WIN1256        | Windows<br>CP1256                | Arabic                              | Yes     | Yes  | 1              |                                                |
+
+| Name    | Description       | Language   | Server? | ICU? | Bytes/<br>Char | Aliases                          |
+|---------|-------------------|------------|---------|------|----------------|----------------------------------|
+| WIN1257 | Windows<br>CP1257 | Baltic     | Yes     | Yes  | 1              |                                  |
+| WIN1258 | Windows<br>CP1258 | Vietnamese | Yes     | Yes  | 1              | ABC, TCVN,<br>TCVN5712,<br>VSCII |
+
+Not all client APIs support all the listed character sets. For example, the PostgreSQL JDBC driver does not support MULE\_INTERNAL, LATIN6, LATIN8, and LATIN10.
+
+The SQL\_ASCII setting behaves considerably differently from the other settings. When the server character set is SQL\_ASCII, the server interprets byte values 0–127 according to the ASCII standard, while byte values 128–255 are taken as uninterpreted characters. No encoding conversion will be done when the setting is SQL\_ASCII. Thus, this setting is not so much a declaration that a specific encoding is in use, as a declaration of ignorance about the encoding. In most cases, if you are working with any non-ASCII data, it is unwise to use the SQL\_ASCII setting because PostgreSQL will be unable to help you by converting or validating non-ASCII characters.

@@ -1,0 +1,14 @@
+---
+source: PostgreSQL 15 Reference
+title: 00_Overview
+---
+
+A large object descriptor can be closed by calling
+
+```
+int lo_close(PGconn *conn, int fd);
+```
+
+where fd is a large object descriptor returned by lo\_open. On success, lo\_close returns zero. On error, the return value is -1.
+
+Any large object descriptors that remain open at the end of a transaction will be closed automatically.

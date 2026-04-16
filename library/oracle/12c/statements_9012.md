@@ -1,0 +1,66 @@
+# Oracle 12c - statements_9012
+Source: https://docs.oracle.com/database/121/SQLRF/statements_9012.htm
+
+Purpose
+
+Use the `FLASHBACK` `DATABASE` statement to return the database to a past time or system change number (SCN). This statement provides a fast alternative to performing incomplete database recovery.
+
+Following a `FLASHBACK` `DATABASE` operation, in order to have write access to the flashed back database, you must reopen it with an `ALTER` `DATABASE` `OPEN` `RESETLOGS` statement.
+
+Prerequisites
+
+You must have the `SYSDBA`, `SYSBACKUP`, or `SYSDG` system privilege. A fast recovery area must have been prepared for the database. The database must have been put in `FLASHBACK` mode with an `ALTER` `DATABASE` `FLASHBACK` `ON` statement unless you are flashing the database back to a guaranteed restore point. The database must be mounted but not open. In addition:
+
+* The database must run in `ARCHIVELOG` mode.
+* The database must be mounted, but not open, with a current control file. The control file cannot be a backup or re-created. When the database control file is restored from backup or re-created, all existing flashback log information is discarded.
+* The database must contain no online tablespaces for which flashback functionality was disabled with the SQL statement `ALTER` `TABLESPACE` ... `FLASHBACK` `OFF`.
+
+Semantics
+
+When you issue a `FLASHBACK` `DATABASE` statement, Oracle Database first verifies that all required archived and online redo logs are available. If they are available, then it reverts all currently online data files in the database to the SCN or time specified in this statement.
+
+* The amount of Flashback data retained in the database is controlled by the `DB_FLASHBACK_RETENTION_TARGET` initialization parameter and the size of the fast recovery area. You can determine how far back you can flash back the database by querying the `V$FLASHBACK_DATABASE_LOG` view.
+* If insufficient data remains in the database to perform the flashback, then you can use standard recovery procedures to recover the database to a past point in time.
+* If insufficient data remains for a set of data files, then the database returns an error. In this case, you can take those data files offline and reissue the statement to revert the remainder of the database. You can then attempt to recover the offline data files using standard recovery procedures.
+
+STANDBY
+
+Specify `STANDBY` to revert the standby database to an earlier SCN or time. If the database is not a standby database, then the database returns an error. If you omit this clause, then `database` can be either a primary or a standby database.
+
+TO SCN Clause
+
+Specify a system change number (SCN):
+
+You can determine the current SCN by querying the `CURRENT_SCN` column of the [`V$DATABASE`](../REFRN/GUID-C62A7B96-2DD4-4E70-A0D9-26EE4BFBE256.md#REFRN30047) view. This in turn lets you save the SCN to a spool file, for example, before running a high-risk batch job.
+
+TO TIMESTAMP Clause
+
+Specify a valid datetime expression.
+
+You can represent the timestamp as an offset from a determinate value, such as `SYSDATE`, or as an absolute system timestamp.
+
+TO RESTORE POINT Clause
+
+Specify this clause to flash back the database to the specified restore point. If you have not enabled flashback database, then this is the only clause you can specify in this `FLASHBACK` `DATABASE` statement. If the database is not in `FLASHBACK` mode, as described in the "Prerequisites" section above, then this is the only clause you can specify for this statement.
+
+RESETLOGS
+
+Specify `TO` `BEFORE` `RESETLOGS` to flash the database back to just before the last resetlogs operation (`ALTER` `DATABASE` `OPEN` `RESETLOGS`).
+
+Examples
+
+Assuming that you have prepared a fast recovery area for the database and enabled media recovery, enable database `FLASHBACK` mode and open the database with the following statements:
+
+```
+STARTUP MOUNT 
+ALTER DATABASE FLASHBACK ON;
+ALTER DATABASE OPEN;
+```
+
+With your database open for at least a day, you can flash back the database one day with the following statements:
+
+```
+SHUTDOWN DATABASE
+STARTUP MOUNT 
+FLASHBACK DATABASE TO TIMESTAMP SYSDATE-1;
+```

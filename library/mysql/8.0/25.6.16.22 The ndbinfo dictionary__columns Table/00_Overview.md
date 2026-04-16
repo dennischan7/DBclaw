@@ -1,0 +1,208 @@
+---
+source: MySQL 8.0 Reference
+title: 00_Overview
+---
+
+The table provides NDB dictionary information about columns of NDB tables. dictionary\_columns has the columns listed here (with brief descriptions):
+
+• table\_id
+
+ID of the table containing the column
+
+• column\_id
+
+The column's unique ID
+
+• name
+
+Name of the column
+
+• column\_type
+
+Data type of the column from the NDB API; see [Column::Type,](https://dev.mysql.com/doc/ndbapi/en/ndb-column.md#ndb-column-type) for possible values
+
+• default\_value
+
+The column's default value, if any
+
+• nullable
+
+Either of NULL or NOT NULL
+
+• array\_type
+
+The column's internal attribute storage format; one of FIXED, SHORT\_VAR, or MEDIUM\_VAR; for more information, see [Column::ArrayType](https://dev.mysql.com/doc/ndbapi/en/ndb-column.md#ndb-column-arraytype), in the NDB API documentation
+
+• storage\_type
+
+Type of storage used by the table; either of MEMORY or DISK
+
+- primary\_key
+  - 1 if this is a primary key column, otherwise 0
+- partition\_key
+  - 1 if this is a partitioning key column, otherwise 0
+- dynamic
+  - 1 if the column is dynamic, otherwise 0
+- auto\_inc
+  - 1 if this is an AUTO\_INCREMENT column, otherwise 0
+
+You can obtain information about all of the columns in a given table by joining dictionary\_columns with the [dictionary\\_tables](#page-152-0) table, like this:
+
+```
+SELECT dc.*
+ FROM dictionary_columns dc
+JOIN dictionary_tables dt
+ ON dc.table_id=dt.table_id
+WHERE dt.table_name='t1'
+ AND dt.database_name='mydb';
+```
+
+The dictionary\_columns table was added in NDB 8.0.29.
+
+![](_page_152_Picture_1.jpeg)
+
+#### **Note**
+
+Blob columns are not shown in this table. This is a known issue.
+
+# <span id="page-152-0"></span>**25.6.16.23 The ndbinfo dictionary\_tables Table**
+
+This table provides NDB dictionary information for NDB tables. dictionary\_tables contains the columns listed here:
+
+• table\_id
+
+The table' unique ID
+
+• database\_name
+
+Name of the database containing the table
+
+• table\_name
+
+Name of the table
+
+• status
+
+The table status; one of New, Changed, Retrieved, Invalid, or Altered. (See [Object::Status](https://dev.mysql.com/doc/ndbapi/en/ndb-object.md#ndb-object-status), for more information about object status values.)
+
+• attributes
+
+Number of table attributes
+
+• primary\_key\_cols
+
+Number of columns in the table's primary key
+
+• primary\_key
+
+A comma-separated list of the columns in the table's primary key
+
+• storage
+
+Type of storage used by the table; one of memory, disk, or default
+
+• logging
+
+Whether logging is enabled for this table
+
+- dynamic
+  - 1 if the table is dynamic, otherwise 0; the table is considered dynamic if table- >[getForceVarPart\(\)](https://dev.mysql.com/doc/ndbapi/en/ndb-table.md#ndb-table-getforcevarpart) is true, or if at least one table column is dynamic
+- read\_backup
+  - 1 if read from any replica (READ\_BACKUP option is enabled for this table, otherwise 0; see Section 15.1.20.12, "Setting NDB Comment Options")
+- fully\_replicated
+  - 1 if FULLY\_REPLICATED is enabled for this table (each data node in the cluster has a complete copy of the table), 0 if not; see Section 15.1.20.12, "Setting NDB Comment Options"
+- checksum
+
+If this table uses a checksum, the value in this column is 1; if not, it is 0
+
+• row\_size
+
+The amount of data, in bytes that can be stored in one row, not including any blob data stored separately in blob tables; see [Table::getRowSizeInBytes\(\)](https://dev.mysql.com/doc/ndbapi/en/ndb-table.md#ndb-table-getrowsizeinbytes), in the API documentation, for more information
+
+• min\_rows
+
+Minimum number of rows, as used for calculating partitions; see [Table::getMinRows\(\)](https://dev.mysql.com/doc/ndbapi/en/ndb-table.md#ndb-table-getminrows), in the API documentation, for more information
+
+• max\_rows
+
+Maximum number of rows, as used for calculating partitions; see [Table::getMaxRows\(\),](https://dev.mysql.com/doc/ndbapi/en/ndb-table.md#ndb-table-getmaxrows) in the API documentation, for more information
+
+• tablespace
+
+ID of the tablespace to which the table belongs, if any; this is 0, if the table does not use data on disk
+
+• fragment\_type
+
+The table's fragment type; one of Single, AllSmall, AllMedium, AllLarge, DistrKeyHash, DistrKeyLin, UserDefined, unused, or HashMapPartition; for more information, see [Object::FragmentType](https://dev.mysql.com/doc/ndbapi/en/ndb-object.md#ndb-object-fragmenttype), in the NDB API documentation
+
+• hash\_map
+
+The hash map used by the table
+
+• fragments
+
+Number of table fragments
+
+• partitions
+
+Number of partitions used by the table
+
+• partition\_balance
+
+Type of partition balance used, if any; one of FOR\_RP\_BY\_NODE, FOR\_RA\_BY\_NODE, FOR\_RP\_BY\_LDM, FOR\_RA\_BY\_LDM, FOR\_RA\_BY\_LDM\_X\_2, FOR\_RA\_BY\_LDM\_X\_3, or FOR\_RA\_BY\_LDM\_X\_4; see Section 15.1.20.12, "Setting NDB Comment Options"
+
+• contains\_GCI
+
+1 if the table includes a global checkpoint index, otherwise 0
+
+• single\_user\_mode
+
+Type of access allowed to the table when single user mode is in effect; one of locked, read\_only, or read\_write; these are equivalent to the values SingleUserModeLocked, SingleUserModeReadOnly, and SingleUserModeReadWrite, respectively, of the [Table::SingleUserMode](https://dev.mysql.com/doc/ndbapi/en/ndb-table.md#ndb-table-singleusermode) type in the NDB API
+
+• force\_var\_part
+
+This is 1 if table-[>getForceVarPart\(\)](https://dev.mysql.com/doc/ndbapi/en/ndb-table.md#ndb-table-getforcevarpart) is true for this table, and 0 if it is not
+
+• GCI\_bits
+
+### Used in testing
+
+• author\_bits
+
+Used in testing
+
+The dictionary\_tables table was added in NDB 8.0.29.
+
+# <span id="page-154-0"></span>**25.6.16.24 The ndbinfo dict\_obj\_info Table**
+
+The dict\_obj\_info table provides information about NDB data dictionary ([DICT](https://dev.mysql.com/doc/ndb-internals/en/ndb-internals-kernel-blocks-dbdict.md)) objects such as tables and indexes. (The [dict\\_obj\\_types](#page-157-0) table can be queried for a list of all the types.) This information includes the object's type, state, parent object (if any), and fully qualified name.
+
+The dict\_obj\_info table contains the following columns:
+
+• type
+
+Type of [DICT](https://dev.mysql.com/doc/ndb-internals/en/ndb-internals-kernel-blocks-dbdict.md) object; join on [dict\\_obj\\_types](#page-157-0) to obtain the name
+
+• id
+
+Object identifier; for Disk Data undo log files and data files, this is the same as the value shown in the LOGFILE\_GROUP\_NUMBER column of the Information Schema FILES table; for undo log files, it also the same as the value shown for the log\_id column in the ndbinfo [logbuffers](#page-171-0) and [logspaces](#page-172-1) tables
+
+• version
+
+Object version
+
+• state
+
+Object state; see [Object::State](https://dev.mysql.com/doc/ndbapi/en/ndb-object.md#ndb-object-state) for values and descriptions.
+
+• parent\_obj\_type
+
+Parent object's type (a dict\_obj\_types type ID); 0 indicates that the object has no parent
+
+• parent\_obj\_id
+
+Parent object ID (such as a base table); 0 indicates that the object has no parent
+
+• fq\_name
+
+Fully qualified object name; for a table, this has the form database\_name/def/table\_name, for a primary key, the form is sys/def/table\_id/PRIMARY, and for a unique key it is sys/ def/table\_id/uk\_name\$unique

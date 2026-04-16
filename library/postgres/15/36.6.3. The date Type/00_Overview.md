@@ -1,0 +1,204 @@
+---
+source: PostgreSQL 15 Reference
+title: 00_Overview
+---
+
+The date type in C enables your programs to deal with data of the SQL type date. See Section 8.5 for the equivalent type in the PostgreSQL server.
+
+The following functions can be used to work with the date type:
+
+```
+PGTYPESdate_from_timestamp
+```
+
+Extract the date part from a timestamp.
+
+```
+date PGTYPESdate_from_timestamp(timestamp dt);
+```
+
+The function receives a timestamp as its only argument and returns the extracted date part from this timestamp.
+
+```
+PGTYPESdate_from_asc
+```
+
+Parse a date from its textual representation.
+
+```
+date PGTYPESdate_from_asc(char *str, char **endptr);
+```
+
+The function receives a C char\* string str and a pointer to a C char\* string endptr. At the moment ECPG always parses the complete string and so it currently does not support to store the address of the first invalid character in \*endptr. You can safely set endptr to NULL.
+
+Note that the function always assumes MDY-formatted dates and there is currently no variable to change that within ECPG.
+
+[Table 36.2](#page-37-0) shows the allowed input formats.
+
+<span id="page-37-0"></span>**Table 36.2. Valid Input Formats for PGTYPESdate\_from\_asc**
+
+| Input           | Result           |
+|-----------------|------------------|
+| January 8, 1999 | January 8, 1999  |
+| 1999-01-08      | January 8, 1999  |
+| 1/8/1999        | January 8, 1999  |
+| 1/18/1999       | January 18, 1999 |
+| 01/02/03        | February 1, 2003 |
+| 1999-Jan-08     | January 8, 1999  |
+| Jan-08-1999     | January 8, 1999  |
+| 08-Jan-1999     | January 8, 1999  |
+| 99-Jan-08       | January 8, 1999  |
+
+| Input            | Result                        |
+|------------------|-------------------------------|
+| 08-Jan-99        | January 8, 1999               |
+| 08-Jan-06        | January 8, 2006               |
+| Jan-08-99        | January 8, 1999               |
+| 19990108         | ISO 8601; January 8, 1999     |
+| 990108           | ISO 8601; January 8, 1999     |
+| 1999.008         | year and day of year          |
+| J2451187         | Julian day                    |
+| January 8, 99 BC | year 99 before the Common Era |
+
+PGTYPESdate\_to\_asc
+
+Return the textual representation of a date variable.
+
+```
+char *PGTYPESdate_to_asc(date dDate);
+```
+
+The function receives the date dDate as its only parameter. It will output the date in the form 1999-01-18, i.e., in the YYYY-MM-DD format. The result must be freed with PGTYPE-Schar\_free().
+
+<span id="page-38-0"></span>PGTYPESdate\_julmdy
+
+Extract the values for the day, the month and the year from a variable of type date.
+
+```
+void PGTYPESdate_julmdy(date d, int *mdy);
+```
+
+The function receives the date d and a pointer to an array of 3 integer values mdy. The variable name indicates the sequential order: mdy[0] will be set to contain the number of the month, mdy[1] will be set to the value of the day and mdy[2] will contain the year.
+
+```
+PGTYPESdate_mdyjul
+```
+
+Create a date value from an array of 3 integers that specify the day, the month and the year of the date.
+
+```
+void PGTYPESdate_mdyjul(int *mdy, date *jdate);
+```
+
+The function receives the array of the 3 integers (mdy) as its first argument and as its second argument a pointer to a variable of type date that should hold the result of the operation.
+
+```
+PGTYPESdate_dayofweek
+```
+
+Return a number representing the day of the week for a date value.
+
+```
+int PGTYPESdate_dayofweek(date d);
+```
+
+The function receives the date variable d as its only argument and returns an integer that indicates the day of the week for this date.
+
+- 0 Sunday
+- 1 Monday
+- 2 Tuesday
+
+- 3 Wednesday
+- 4 Thursday
+- 5 Friday
+- 6 Saturday
+
+```
+PGTYPESdate_today
+```
+
+Get the current date.
+
+```
+void PGTYPESdate_today(date *d);
+```
+
+The function receives a pointer to a date variable (d) that it sets to the current date.
+
+```
+PGTYPESdate_fmt_asc
+```
+
+Convert a variable of type date to its textual representation using a format mask.
+
+```
+int PGTYPESdate_fmt_asc(date dDate, char *fmtstring, char
+ *outbuf);
+```
+
+The function receives the date to convert (dDate), the format mask (fmtstring) and the string that will hold the textual representation of the date (outbuf).
+
+On success, 0 is returned and a negative value if an error occurred.
+
+The following literals are the field specifiers you can use:
+
+- dd The number of the day of the month.
+- mm The number of the month of the year.
+- yy The number of the year as a two digit number.
+- yyyy The number of the year as a four digit number.
+- ddd The name of the day (abbreviated).
+- mmm The name of the month (abbreviated).
+
+All other characters are copied 1:1 to the output string.
+
+[Table 36.3](#page-39-0) indicates a few possible formats. This will give you an idea of how to use this function. All output lines are based on the same date: November 23, 1959.
+
+<span id="page-39-0"></span>**Table 36.3. Valid Input Formats for PGTYPESdate\_fmt\_asc**
+
+| Format       | Result       |
+|--------------|--------------|
+| mmddyy       | 112359       |
+| ddmmyy       | 231159       |
+| yymmdd       | 591123       |
+| yy/mm/dd     | 59/11/23     |
+| yy mm dd     | 59 11 23     |
+| yy.mm.dd     | 59.11.23     |
+| .mm.yyyy.dd. | .11.1959.23. |
+
+| Format              | Result              |
+|---------------------|---------------------|
+| mmm. dd, yyyy       | Nov. 23, 1959       |
+| mmm dd yyyy         | Nov 23 1959         |
+| yyyy dd mm          | 1959 23 11          |
+| ddd, mmm. dd, yyyy  | Mon, Nov. 23, 1959  |
+| (ddd) mmm. dd, yyyy | (Mon) Nov. 23, 1959 |
+
+<span id="page-40-1"></span>PGTYPESdate\_defmt\_asc
+
+Use a format mask to convert a C char\* string to a value of type date.
+
+```
+int PGTYPESdate_defmt_asc(date *d, char *fmt, char *str);
+```
+
+The function receives a pointer to the date value that should hold the result of the operation (d), the format mask to use for parsing the date (fmt) and the C char\* string containing the textual representation of the date (str). The textual representation is expected to match the format mask. However you do not need to have a 1:1 mapping of the string to the format mask. The function only analyzes the sequential order and looks for the literals yy or yyyy that indicate the position of the year, mm to indicate the position of the month and dd to indicate the position of the day.
+
+<span id="page-40-0"></span>[Table 36.4](#page-40-0) indicates a few possible formats. This will give you an idea of how to use this function.
+
+**Table 36.4. Valid Input Formats for rdefmtdate**
+
+| Format      | String                                                                                     | Result     |
+|-------------|--------------------------------------------------------------------------------------------|------------|
+| ddmmyy      | 21-2-54                                                                                    | 1954-02-21 |
+| ddmmyy      | 2-12-54                                                                                    | 1954-12-02 |
+| ddmmyy      | 20111954                                                                                   | 1954-11-20 |
+| ddmmyy      | 130464                                                                                     | 1964-04-13 |
+| mmm.dd.yyyy | MAR-12-1967                                                                                | 1967-03-12 |
+| yy/mm/dd    | 1954, February 3rd                                                                         | 1954-02-03 |
+| mmm.dd.yyyy | 041269                                                                                     | 1969-04-12 |
+| yy/mm/dd    | In the year 2525,<br>in the month of Ju<br>ly, mankind will be<br>alive on the 28th<br>day | 2525-07-28 |
+| dd-mm-yy    | I said on the 28th<br>of July in the year<br>2525                                          | 2525-07-28 |
+| mmm.dd.yyyy | 9/14/58                                                                                    | 1958-09-14 |
+| yy/mm/dd    | 47/03/29                                                                                   | 1947-03-29 |
+| mmm.dd.yyyy | oct 28 1975                                                                                | 1975-10-28 |
+| mmddyy      | Nov 14th, 1985                                                                             | 1985-11-14 |

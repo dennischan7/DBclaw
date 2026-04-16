@@ -1,0 +1,31 @@
+# Oracle 12c - functions168
+Source: https://docs.oracle.com/database/121/SQLRF/functions168.htm
+
+[Go to main content](#BEGIN)
+
+241/555 
+
+# ROUND (date)
+
+Syntax
+
+round\_date::=
+
+Purpose
+
+`ROUND` returns `date` rounded to the unit specified by the format model `fmt`. This function is not sensitive to the `NLS_CALENDAR` session parameter. It operates according to the rules of the Gregorian calendar. The value returned is always of data type `DATE`, even if you specify a different datetime data type for `date`. If you omit `fmt`, then `date` is rounded to the nearest day. The `date` expression must resolve to a `DATE` value.
+
+Examples
+
+The following example rounds a date to the first day of the following year:
+
+```
+SELECT ROUND (TO_DATE ('27-OCT-00'),'YEAR')
+   "New Year" FROM DUAL;
+ 
+New Year
+---------
+01-JAN-01
+```
+
+Scripting on this page enhances content navigation, but does not change the content in any way.

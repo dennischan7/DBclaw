@@ -1,0 +1,6 @@
+---
+source: PostgreSQL 16 Reference
+title: 00_Overview
+---
+
+If the publication contains a partitioned table, the publication parameter publish\_via\_partition\_root determines which row filter is used. If publish\_via\_partition\_root is true, the *root partitioned table's* row filter is used. Otherwise, if publish\_via\_partition\_root is false (default), each *partition's* row filter is used.

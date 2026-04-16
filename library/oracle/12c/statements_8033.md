@@ -1,0 +1,33 @@
+# Oracle 12c - statements_8033
+Source: https://docs.oracle.com/database/121/SQLRF/statements_8033.htm
+
+[Go to main content](#BEGIN)
+
+488/555 
+
+# DROP ROLLBACK SEGMENT
+
+Purpose
+
+Use the `DROP` `ROLLBACK` `SEGMENT` to remove a rollback segment from the database. When you drop a rollback segment, all space allocated to the rollback segment returns to the tablespace.
+
+Note:
+
+If your database is running in automatic undo mode, then this is the only valid operation on rollback segments. In that mode, you cannot create or alter a rollback segment.
+
+Prerequisites
+
+You must have the `DROP` `ROLLBACK` `SEGMENT` system privilege, and the rollback segment must be offline.
+
+Semantics
+
+rollback\_segment
+
+Specify the name the rollback segment to be dropped.
+
+Restrictions on Dropping Rollback Segments This statement is subject to the following restrictions:
+
+* You can drop a rollback segment only if it is offline. To determine whether a rollback segment is offline, query the data dictionary view `DBA_ROLLBACK_SEGS`. Offline rollback segments have the value `AVAILABLE` in the `STATUS` column. You can take a rollback segment offline with the `OFFLINE` clause of the `ALTER` `ROLLBACK` `SEGMENT` statement.
+* You cannot drop the `SYSTEM` rollback segment.
+
+Scripting on this page enhances content navigation, but does not change the content in any way.

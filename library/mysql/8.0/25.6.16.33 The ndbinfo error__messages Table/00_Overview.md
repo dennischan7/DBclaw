@@ -1,0 +1,63 @@
+---
+source: MySQL 8.0 Reference
+title: 00_Overview
+---
+
+The error\_messages table provides information about
+
+The error\_messages table contains the following columns:
+
+• error\_code
+
+Numeric error code
+
+• error\_description
+
+Description of error
+
+• error\_status
+
+Error status code
+
+• error\_classification
+
+Error classification code
+
+# **Notes**
+
+error\_code is a numeric NDB error code. This is the same error code that can be supplied to ndb\_perror.
+
+error\_description provides a basic description of the condition causing the error.
+
+The error\_status column provides status information relating to the error. Possible values for this column are listed here:
+
+- No error
+- Illegal connect string
+- Illegal server handle
+- Illegal reply from server
+- Illegal number of nodes
+- Illegal node status
+- Out of memory
+- Management server not connected
+- Could not connect to socket
+- Start failed
+- Stop failed
+- Restart failed
+- Could not start backup
+- Could not abort backup
+- Could not enter single user mode
+- Could not exit single user mode
+- Failed to complete configuration change
+- Failed to get configuration
+
+- Usage error
+- Success
+- Permanent error
+- Temporary error
+- Unknown result
+- Temporary error, restart node
+- Permanent error, external action needed
+- Ndbd file system error, restart node initial
+- Unknown
+
+The error\_classification column shows the error classification. See [NDB Error Classifications](https://dev.mysql.com/doc/ndbapi/en/ndb-error-classifications.md), for information about classification codes and their meanings.

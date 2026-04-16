@@ -1,0 +1,29 @@
+---
+source: MySQL 8.0 Reference
+title: 00_Overview
+---
+
+The EXAMPLE storage engine is a stub engine that does nothing. Its purpose is to serve as an example in the MySQL source code that illustrates how to begin writing new storage engines. As such, it is primarily of interest to developers.
+
+To enable the EXAMPLE storage engine if you build MySQL from source, invoke CMake with the - DWITH\_EXAMPLE\_STORAGE\_ENGINE option.
+
+To examine the source for the EXAMPLE engine, look in the storage/example directory of a MySQL source distribution.
+
+When you create an EXAMPLE table, no files are created. No data can be stored into the table. Retrievals return an empty result.
+
+```
+mysql> CREATE TABLE test (i INT) ENGINE = EXAMPLE;
+Query OK, 0 rows affected (0.78 sec)
+mysql> INSERT INTO test VALUES(1),(2),(3);
+ERROR 1031 (HY000): Table storage engine for 'test' doesn't »
+ have this option
+```
+
+```
+mysql> SELECT * FROM test;
+Empty set (0.31 sec)
+```
+
+The EXAMPLE storage engine does not support indexing.
+
+The EXAMPLE storage engine does not support partitioning.

@@ -1,0 +1,31 @@
+---
+source: PostgreSQL 15 Reference
+title: 00_Overview
+---
+
+Similar to the directive #define that is known from C, embedded SQL has a similar concept:
+
+```
+EXEC SQL DEFINE name;
+EXEC SQL DEFINE name value;
+So you can define a name:
+EXEC SQL DEFINE HAVE_FEATURE;
+And you can also define constants:
+EXEC SQL DEFINE MYNUMBER 12;
+EXEC SQL DEFINE MYSTRING 'abc';
+Use undef to remove a previous definition:
+```
+
+EXEC SQL UNDEF MYNUMBER;
+
+Of course you can continue to use the C versions #define and #undef in your embedded SQL program. The difference is where your defined values get evaluated. If you use EXEC SQL DEFINE then the ecpg preprocessor evaluates the defines and substitutes the values. For example if you write:
+
+```
+EXEC SQL DEFINE MYNUMBER 12;
+...
+EXEC SQL UPDATE Tbl SET col = MYNUMBER;
+```
+
+then ecpg will already do the substitution and your C compiler will never see any name or identifier MYNUMBER. Note that you cannot use #define for a constant that you are going to use in an embedded SQL query because in this case the embedded SQL precompiler is not able to see this declaration.
+
+If multiple input files are named on the ecpg preprocessor's command line, the effects of EXEC SQL DEFINE and EXEC SQL UNDEF do not carry across files: each file starts with only the symbols defined by -D switches on the command line.

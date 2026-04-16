@@ -1,0 +1,195 @@
+---
+source: MySQL 8.0 Reference
+title: 00_Overview
+---
+
+The following functions, which are available from MySQL 8.0.22 for standard source to replica replication and from MySQL 8.0.23 for Group Replication, enable you to add and remove replication source servers from the source list for a replication channel. From MySQL 8.0.27, you can also clear the source list for a server.
+
+**Table 14.27 Failover Channel Functions**
+
+| Name                                                                                      | Description                                                                                                                              |
+|-------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| asynchronous_connection_failover_add_managed()                                            | Add group member source server configuration<br>information to a replication channel source list                                         |
+|                                                                                           | asynchronous_connection_failover_add_source() Add source server configuration information server<br>to a replication channel source list |
+| asynchronous_connection_failover_delete_managed()                                         | Remove a managed group from a replication<br>channel source list                                                                         |
+| asynchronous_connection_failover_delete_source()                                          | Remove a source server from a replication<br>channel source list                                                                         |
+| asynchronous_connection_failover_reset()Remove all settings relating to group replication | asynchronous failover                                                                                                                    |
+
+The asynchronous connection failover mechanism automatically establishes an asynchronous (source to replica) replication connection to a new source from the appropriate list after the existing connection from the replica to its source fails. From MySQL 8.0.23, the connection is also changed if the currently connected source does not have the highest weighted priority in the group. For Group Replication source servers that are defined as part of a managed group, the connection is also failed over to another group member if the currently connected source leaves the group or is no longer in the majority. For more information on the mechanism, see Section 19.4.9, "Switching Sources and Replicas with Asynchronous Connection Failover".
+
+Source lists are stored in the mysql.replication\_asynchronous\_connection\_failover and mysql.replication\_asynchronous\_connection\_failover\_managed tables, and can be viewed in the Performance Schema replication\_asynchronous\_connection\_failover table. If the replication channel is on a Group Replication primary for a group where failover between replicas is active, the source list is broadcast to all the group members when they join or when it is updated by any method. Failover between replicas is controlled by the mysql\_start\_failover\_channels\_if\_primary member action, which is enabled by default, and can be disabled using the [group\\_replication\\_disable\\_member\\_action](#page-171-0) function.
+
+<span id="page-176-0"></span>• [asynchronous\\_connection\\_failover\\_add\\_managed\(\)](#page-176-0)
+
+Add configuration information for a replication source server that is part of a managed group (a Group Replication group member) to the source list for a replication channel. You only need to add one group member. The replica automatically adds the rest from the current group membership, then keeps the source list updated in line with membership change.
+
+### Syntax:
+
+asynchronous\_connection\_failover\_add\_managed(channel, managed\_type, managed\_name, host, port, network\_namespace, primary\_weight, secondary\_weight)
+
+### Arguments:
+
+- channel: The replication channel for which this replication source server is part of the source list.
+- managed\_type: The type of managed service that the asynchronous connection failover mechanism must provide for this server. The only value currently accepted is GroupReplication.
+- managed\_name: The identifier for the managed group that the server is a part of. For the GroupReplication managed service, the identifier is the value of the group\_replication\_group\_name system variable.
+- host: The host name for this replication source server.
+- port: The port number for this replication source server.
+- network\_namespace: The network namespace for this replication source server. Specify an empty string, as this parameter is reserved for future use.
+- primary\_weight: The priority of this replication source server in the replication channel's source list when it is acting as the primary for the managed group. The weight is from 1 to 100, with 100 being the highest. For the primary, 80 is a suitable weight. The asynchronous connection failover mechanism activates if the currently connected source is not the highest weighted in the group. Assuming that you set up the managed group to give a higher weight to a primary and a lower weight to a secondary, when the primary changes, its weight increases, and the replica changes over the connection to it.
+- secondary\_weight: The priority of this replication source server in the replication channel's source list when it is acting as a secondary in the managed group. The weight is from 1 to 100, with 100 being the highest. For a secondary, 60 is a suitable weight.
+
+### Return value:
+
+A string containing the result of the operation, for example whether it was successful or not.
+
+### Example:
+
+```
+SELECT asynchronous_connection_failover_add_managed('channel2', 'GroupReplication', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '127.0.0.1', 3310, '', 80, 60);
++----------------------------------------------------------------------------------------------------------------------------------------------------+
+| asynchronous_connection_failover_add_source('channel2', 'GroupReplication', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '127.0.0.1', 3310, '', 80, 60) |
++----------------------------------------------------------------------------------------------------------------------------------------------------+
+| Source managed configuration details successfully inserted. |
+```
+
++----------------------------------------------------------------------------------------------------------------------------------------------------+
+
+For more information, see Section 19.4.9, "Switching Sources and Replicas with Asynchronous Connection Failover".
+
+<span id="page-177-0"></span>• [asynchronous\\_connection\\_failover\\_add\\_source\(\)](#page-177-0)
+
+Add configuration information for a replication source server to the source list for a replication channel.
+
+### Syntax:
+
+```
+asynchronous_connection_failover_add_source(channel, host, port, network_namespace, weight)
+```
+
+### Arguments:
+
+- channel: The replication channel for which this replication source server is part of the source list.
+- host: The host name for this replication source server.
+- port: The port number for this replication source server.
+- network\_namespace: The network namespace for this replication source server. Specify an empty string, as this parameter is reserved for future use.
+- weight: The priority of this replication source server in the replication channel's source list. The priority is from 1 to 100, with 100 being the highest, and 50 being the default. When the asynchronous connection failover mechanism activates, the source with the highest priority setting among the alternative sources listed in the source list for the channel is chosen for the first connection attempt. If this attempt does not work, the replica tries with all the listed sources in descending order of priority, then starts again from the highest priority source. If multiple sources have the same priority, the replica orders them randomly. From MySQL 8.0.23, the asynchronous connection failover mechanism activates if the source currently connected is not the highest weighted in the group.
+
+### Return value:
+
+A string containing the result of the operation, for example whether it was successful or not.
+
+### Example:
+
+```
+SELECT asynchronous_connection_failover_add_source('channel2', '127.0.0.1', 3310, '', 80);
++-------------------------------------------------------------------------------------------------+
+| asynchronous_connection_failover_add_source('channel2', '127.0.0.1', 3310, '', 80) |
++-------------------------------------------------------------------------------------------------+
+| Source configuration details successfully inserted. |
++-------------------------------------------------------------------------------------------------+
+```
+
+For more information, see Section 19.4.9, "Switching Sources and Replicas with Asynchronous Connection Failover".
+
+<span id="page-178-0"></span>• [asynchronous\\_connection\\_failover\\_delete\\_managed\(\)](#page-178-0)
+
+Remove an entire managed group from the source list for a replication channel. When you use this function, all the replication source servers defined in the managed group are removed from the channel's source list.
+
+### Syntax:
+
+```
+asynchronous_connection_failover_delete_managed(channel, managed_name)
+```
+
+### Arguments:
+
+- channel: The replication channel for which this replication source server was part of the source list.
+- managed\_name: The identifier for the managed group that the server is a part of. For the GroupReplication managed service, the identifier is the value of the group\_replication\_group\_name system variable.
+
+### Return value:
+
+A string containing the result of the operation, for example whether it was successful or not.
+
+### Example:
+
+```
+SELECT asynchronous_connection_failover_delete_managed('channel2', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
++-----------------------------------------------------------------------------------------------------+
+| asynchronous_connection_failover_delete_managed('channel2', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa') |
++-----------------------------------------------------------------------------------------------------+
+| Source managed configuration details successfully deleted. |
++-----------------------------------------------------------------------------------------------------+
+```
+
+For more information, see Section 19.4.9, "Switching Sources and Replicas with Asynchronous Connection Failover".
+
+<span id="page-178-1"></span>• [asynchronous\\_connection\\_failover\\_delete\\_source\(\)](#page-178-1)
+
+Remove configuration information for a replication source server from the source list for a replication channel.
+
+### Syntax:
+
+```
+asynchronous_connection_failover_delete_source(channel, host, port, network_namespace)
+```
+
+### Arguments:
+
+- channel: The replication channel for which this replication source server was part of the source list.
+- host: The host name for this replication source server.
+- port: The port number for this replication source server.
+- network\_namespace: The network namespace for this replication source server. Specify an empty string, as this parameter is reserved for future use.
+
+### Return value:
+
+A string containing the result of the operation, for example whether it was successful or not.
+
+### Example:
+
+```
+SELECT asynchronous_connection_failover_delete_source('channel2', '127.0.0.1', 3310, '');
++------------------------------------------------------------------------------------------------+ 2549
+```
+
+```
+| asynchronous_connection_failover_delete_source('channel2', '127.0.0.1', 3310, '') |
++------------------------------------------------------------------------------------------------+
+| Source configuration details successfully deleted. |
++------------------------------------------------------------------------------------------------+
+```
+
+For more information, see Section 19.4.9, "Switching Sources and Replicas with Asynchronous Connection Failover".
+
+<span id="page-179-0"></span>• [asynchronous\\_connection\\_failover\\_reset\(\)](#page-179-0)
+
+Remove all settings relating to the asynchronous connection failover mechanism. The function clears the Performance Schema tables replication\_asynchronous\_connection\_failover and replication\_asynchronous\_connection\_failover\_managed.
+
+[asynchronous\\_connection\\_failover\\_reset\(\)](#page-179-0) can be used only on a server that is not currently part of a group, and that does not have any replication channels running. You can use this function to clean up a server that is no longer being used in a managed group.
+
+### Syntax:
+
+```
+STRING asynchronous_connection_failover_reset()
+```
+
+Arguments:
+
+None.
+
+Return value:
+
+A string containing the result of the operation, for example whether it was successful or not.
+
+### Example:
+
+```
+mysql> SELECT asynchronous_connection_failover_reset();
++-------------------------------------------------------------------------+
+| asynchronous_connection_failover_reset() |
++-------------------------------------------------------------------------+
+| The UDF asynchronous_connection_failover_reset() executed successfully. |
++-------------------------------------------------------------------------+
+1 row in set (0.00 sec)
+```
+
+For more information, see Section 19.4.9, "Switching Sources and Replicas with Asynchronous Connection Failover".

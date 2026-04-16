@@ -1,0 +1,604 @@
+---
+source: MySQL 8.4 Reference
+title: 00_Overview
+---
+
+Indexes are used to find documents with specific field values quickly. Without an index, MySQL must begin with the first document and then read through the entire collection to find the relevant fields. The larger the collection, the more this costs. If a collection is large and queries on a specific field are common, then consider creating an index on a specific field inside a document.
+
+For example, the following query performs better with an index on the Population field:
+
+```
+mysql-js> db.countryinfo.find("demographics.Population < 100")
+...[output removed]
+8 documents in set (0.00 sec)
+```
+
+The createIndex() method creates an index that you can define with a JSON document that specifies which fields to use. This section is a high level overview of indexing. For more information see [Indexing Collections](https://dev.mysql.com/doc/x-devapi-userguide/en/collection-indexing.md).
+
+# **Add a Nonunique Index**
+
+To create a nonunique index, pass an index name and the index information to the createIndex() method. Duplicate index names are prohibited.
+
+The following example specifies an index named popul, defined against the Population field from the demographics object, indexed as an Integer numeric value. The final parameter indicates whether the field should require the NOT NULL constraint. If the value is false, the field can contain NULL values. The index information is a JSON document with details of one or more fields to include in the index. Each field definition must include the full document path to the field, and specify the type of the field.
+
+```
+mysql-js> db.countryinfo.createIndex("popul", {fields:
+[{field: '$.demographics.Population', type: 'INTEGER'}]})
+```
+
+Here, the index is created using an integer numeric value. Further options are available, including options for use with GeoJSON data. You can also specify the type of index, which has been omitted here because the default type "index" is appropriate.
+
+### **Add a Unique Index**
+
+To create a unique index, pass an index name, the index definition, and the index type "unique" to the createIndex() method. This example shows a unique index created on the country name ("Name"), which is another common field in the countryinfo collection to index. In the index field description, "TEXT(40)" represents the number of characters to index, and "required": True specifies that the field is required to exist in the document.
+
+```
+mysql-js> db.countryinfo.createIndex("name",
+{"fields": [{"field": "$.Name", "type": "TEXT(40)", "required": true}], "unique": true})
+```
+
+### **Drop an Index**
+
+To drop an index, pass the name of the index to drop to the dropIndex() method. For example, you can drop the "popul" index as follows:
+
+```
+mysql-js> db.countryinfo.dropIndex("popul")
+```
+
+### **Related Information**
+
+- See [Indexing Collections](https://dev.mysql.com/doc/x-devapi-userguide/en/collection-indexing.md) for more information.
+- See [Defining an Index](https://dev.mysql.com/doc/x-devapi-userguide/en/collection-indexing.md#collection-index-definitions) for more information on the JSON document that defines an index.
+- See [Collection Index Management Functions](https://dev.mysql.com/doc/x-devapi-userguide/en/crud-ebnf-collection-index-management-functions.md) for the full syntax definition.
+
+# <span id="page-191-0"></span>**22.3.4 Relational Tables**
+
+You can also use X DevAPI to work with relational tables. In MySQL, each relational table is associated with a particular storage engine. The examples in this section use InnoDB tables in the world\_x schema.
+
+## **Confirm the Schema**
+
+To show the schema that is assigned to the db global variable, issue db.
+
+```
+mysql-js> db
+<Schema:world_x>
+```
+
+If the returned value is not Schema:world\_x, set the db variable as follows:
+
+```
+mysql-js> \use world_x
+Schema `world_x` accessible through db.
+```
+
+## **Show All Tables**
+
+To display all relational tables in the world\_x schema, use the getTables() method on the db object.
+
+```
+mysql-js> db.getTables()
+{
+ "city": <Table:city>,
+ "country": <Table:country>,
+ "countrylanguage": <Table:countrylanguage>
+}
+```
+
+# **Basic Table Operations**
+
+Basic operations scoped by tables include:
+
+| Operation form   | Description                                                              |  |  |
+|------------------|--------------------------------------------------------------------------|--|--|
+| db.name.insert() | The insert() method inserts one or more records<br>into the named table. |  |  |
+| db.name.select() | The select() method returns some or all records in<br>the named table.   |  |  |
+| db.name.update() | The update() method updates records in the<br>named table.               |  |  |
+| db.name.delete() | The delete() method deletes one or more records<br>from the named table. |  |  |
+
+# **Related Information**
+
+- See [Working with Relational Tables](https://dev.mysql.com/doc/x-devapi-userguide/en/devapi-users-working-with-relational-tables.md) for more information.
+- [CRUD EBNF Definitions](https://dev.mysql.com/doc/x-devapi-userguide/en/mysql-x-crud-ebnf-definitions.md) provides a complete list of operations.
+- See [Section 22.3.2, "Download and Import world\\_x Database"](#page-180-0) for instructions on setting up the world\_x schema sample.
+
+# <span id="page-192-0"></span>**22.3.4.1 Insert Records into Tables**
+
+You can use the insert() method with the values() method to insert records into an existing relational table. The insert() method accepts individual columns or all columns in the table. Use one or more values() methods to specify the values to be inserted.
+
+### **Insert a Complete Record**
+
+To insert a complete record, pass to the insert() method all columns in the table. Then pass to the values() method one value for each column in the table. For example, to add a new record to the city table in the world\_x schema, insert the following record and press **Enter** twice.
+
+```
+mysql-js> db.city.insert("ID", "Name", "CountryCode", "District", "Info").values(
+None, "Olympia", "USA", "Washington", '{"Population": 5000}')
+```
+
+The city table has five columns: ID, Name, CountryCode, District, and Info. Each value must match the data type of the column it represents.
+
+### **Insert a Partial Record**
+
+The following example inserts values into the ID, Name, and CountryCode columns of the city table.
+
+```
+mysql-js> db.city.insert("ID", "Name", "CountryCode").values(
+None, "Little Falls", "USA").values(None, "Happy Valley", "USA")
+```
+
+When you specify columns using the insert() method, the number of values must match the number of columns. In the previous example, you must supply three values to match the three columns specified.
+
+## **Related Information**
+
+• See [TableInsertFunction](https://dev.mysql.com/doc/x-devapi-userguide/en/crud-ebnf-table-crud-functions.md#crud-ebnf-tableinsertfunction) for the full syntax definition.
+
+# <span id="page-193-0"></span>**22.3.4.2 Select Tables**
+
+You can use the select() method to query for and return records from a table in a database. The X DevAPI provides additional methods to use with the select() method to filter and sort the returned records.
+
+MySQL provides the following operators to specify search conditions: OR (||), AND (&&), XOR, IS, NOT, BETWEEN, IN, LIKE, !=, <>, >, >=, <, <=, &, |, <<, >>, +, -, \*, /, ~, and %.
+
+### **Select All Records**
+
+To issue a query that returns all records from an existing table, use the select() method without specifying search conditions. The following example selects all records from the city table in the world\_x database.
+
+![](_page_193_Picture_14.jpeg)
+
+### **Note**
+
+Limit the use of the empty select() method to interactive statements. Always use explicit column-name selections in your application code.
+
+```
+mysql-js> db.city.select()
++------+------------+-------------+------------+-------------------------+
+| ID | Name | CountryCode | District | Info |
++------+------------+-------------+------------+-------------------------+
+| 1 | Kabul | AFG | Kabol |{"Population": 1780000} |
+| 2 | Qandahar | AFG | Qandahar |{"Population": 237500} |
+| 3 | Herat | AFG | Herat |{"Population": 186800} |
+... ... ... ... ...
+| 4079 | Rafah | PSE | Rafah |{"Population": 92020} |
++------+------- ----+-------------+------------+-------------------------+
+4082 rows in set (0.01 sec)
+```
+
+An empty set (no matching records) returns the following information:
+
+```
+Empty set (0.00 sec)
+```
+
+### **Filter Searches**
+
+To issue a query that returns a set of table columns, use the select() method and specify the columns to return between square brackets. This query returns the Name and CountryCode columns from the city table.
+
+```
+mysql-js> db.city.select(["Name", "CountryCode"])
+```
+
+| +++<br>  Name               | CountryCode |  |
+|-----------------------------|-------------|--|
+| +++                         |             |  |
+| Kabul                       | AFG         |  |
+| Qandahar                    | AFG         |  |
+| Herat                       | AFG         |  |
+| Mazar-e-Sharif              | AFG         |  |
+| Amsterdam                   | NLD         |  |
+|                             |             |  |
+| Rafah                       | PSE         |  |
+| Olympia                     | USA         |  |
+| Little Falls                | USA         |  |
+| Happy Valley                | USA         |  |
+| +++                         |             |  |
+| 4082 rows in set (0.00 sec) |             |  |
+
+To issue a query that returns rows matching specific search conditions, use the where() method to include those conditions. For example, the following example returns the names and country codes of the cities that start with the letter Z.
+
+```
+mysql-js> db.city.select(["Name", "CountryCode"]).where("Name like 'Z%'")
++-------------------+-------------+
+| Name | CountryCode |
++-------------------+-------------+
+| Zaanstad | NLD |
+| Zoetermeer | NLD |
+| Zwolle | NLD |
+| Zenica | BIH |
+| Zagazig | EGY |
+| Zaragoza | ESP |
+| Zamboanga | PHL |
+| Zahedan | IRN |
+| Zanjan | IRN |
+| Zabol | IRN |
+| Zama | JPN |
+| Zhezqazghan | KAZ |
+| Zhengzhou | CHN |
+... ...
+| Zeleznogorsk | RUS |
++-------------------+-------------+
+59 rows in set (0.00 sec)
+```
+
+You can separate a value from the search condition by using the bind() method. For example, instead of using "Name = 'Z%' " as the condition, substitute a named placeholder consisting of a colon followed by a name that begins with a letter, such as name. Then include the placeholder and value in the bind() method as follows:
+
+```
+mysql-js> db.city.select(["Name", "CountryCode"]).
+ where("Name like :name").bind("name", "Z%")
+```
+
+![](_page_194_Picture_6.jpeg)
+
+#### **Tip**
+
+Within a program, binding enables you to specify placeholders in your expressions, which are filled in with values before execution and can benefit from automatic escaping, as appropriate.
+
+Always use binding to sanitize input. Avoid introducing values in queries using string concatenation, which can produce invalid input and, in some cases, can cause security issues.
+
+### **Project Results**
+
+To issue a query using the AND operator, add the operator between search conditions in the where() method.
+
+```
+mysql-js> db.city.select(["Name", "CountryCode"]).where(
+"Name like 'Z%' and CountryCode = 'CHN'")
++----------------+-------------+
+```
+
+```
+| Name | CountryCode |
++----------------+-------------+
+| Zhengzhou | CHN |
+| Zibo | CHN |
+| Zhangjiakou | CHN |
+| Zhuzhou | CHN |
+| Zhangjiang | CHN |
+| Zigong | CHN |
+| Zaozhuang | CHN |
+... ...
+| Zhangjiagang | CHN |
++----------------+-------------+
+22 rows in set (0.01 sec)
+```
+
+To specify multiple conditional operators, you can enclose the search conditions in parenthesis to change the operator precedence. The following example demonstrates the placement of AND and OR operators.
+
+```
+mysql-js> db.city.select(["Name", "CountryCode"]).
+where("Name like 'Z%' and (CountryCode = 'CHN' or CountryCode = 'RUS')")
++-------------------+-------------+
+| Name | CountryCode |
++-------------------+-------------+
+| Zhengzhou | CHN |
+| Zibo | CHN |
+| Zhangjiakou | CHN |
+| Zhuzhou | CHN |
+... ...
+| Zeleznogorsk | RUS |
++-------------------+-------------+
+29 rows in set (0.01 sec)
+```
+
+# **Limit, Order, and Offset Results**
+
+You can apply the limit(), orderBy(), and offSet() methods to manage the number and order of records returned by the select() method.
+
+To specify the number of records included in a result set, append the limit() method with a value to the select() method. For example, the following query returns the first five records in the country table.
+
+```
+mysql-js> db.country.select(["Code", "Name"]).limit(5)
++------+-------------+
+| Code | Name |
++------+-------------+
+| ABW | Aruba |
+| AFG | Afghanistan |
+| AGO | Angola |
+| AIA | Anguilla |
+| ALB | Albania |
++------+-------------+
+5 rows in set (0.00 sec)
+```
+
+To specify an order for the results, append the orderBy() method to the select() method. Pass to the orderBy() method a list of one or more columns to sort by and, optionally, the descending (desc) or ascending (asc) attribute as appropriate. Ascending order is the default order type.
+
+For example, the following query sorts all records by the Name column and then returns the first three records in descending order .
+
+```
+mysql-js> db.country.select(["Code", "Name"]).orderBy(["Name desc"]).limit(3)
++------+------------+
+| Code | Name |
++------+------------+
+| ZWE | Zimbabwe |
+| ZMB | Zambia |
+| YUG | Yugoslavia |
++------+------------+
+3 rows in set (0.00 sec)
+```
+
+By default, the limit() method starts from the first record in the table. You can use the offset() method to change the starting record. For example, to ignore the first record and return the next three records matching the condition, pass to the offset() method a value of 1.
+
+```
+mysql-js> db.country.select(["Code", "Name"]).orderBy(["Name desc"]).limit(3).offset(1)
++------+------------+
+| Code | Name |
++------+------------+
+| ZMB | Zambia |
+| YUG | Yugoslavia |
+| YEM | Yemen |
++------+------------+
+3 rows in set (0.00 sec)
+```
+
+### **Related Information**
+
+- The MySQL Reference Manual provides detailed documentation on functions and operators.
+- See [TableSelectFunction](https://dev.mysql.com/doc/x-devapi-userguide/en/crud-ebnf-table-crud-functions.md#crud-ebnf-tableselectfunction) for the full syntax definition.
+
+# <span id="page-196-0"></span>**22.3.4.3 Update Tables**
+
+You can use the update() method to modify one or more records in a table. The update() method works by filtering a query to include only the records to be updated and then applying the operations you specify to those records.
+
+To replace a city name in the city table, pass to the set() method the new city name. Then, pass to the where() method the city name to locate and replace. The following example replaces the city Peking with Beijing.
+
+```
+mysql-js> db.city.update().set("Name", "Beijing").where("Name = 'Peking'")
+```
+
+Use the select() method to verify the change.
+
+```
+mysql-js> db.city.select(["ID", "Name", "CountryCode", "District", "Info"]).where("Name = 'Beijing'")
++------+-----------+-------------+----------+-----------------------------+
+| ID | Name | CountryCode | District | Info |
++------+-----------+-------------+----------+-----------------------------+
+| 1891 | Beijing | CHN | Peking | {"Population": 7472000} |
++------+-----------+-------------+----------+-----------------------------+
+1 row in set (0.00 sec)
+```
+
+### **Related Information**
+
+• See [TableUpdateFunction](https://dev.mysql.com/doc/x-devapi-userguide/en/crud-ebnf-table-crud-functions.md#crud-ebnf-tableupdatefunction) for the full syntax definition.
+
+# <span id="page-196-1"></span>**22.3.4.4 Delete Tables**
+
+You can use the delete() method to remove some or all records from a table in a database. The X DevAPI provides additional methods to use with the delete() method to filter and order the records to be deleted.
+
+### **Delete Records Using Conditions**
+
+The following example passes search conditions to the delete() method. All records matching the condition are deleted from the city table. In this example, one record matches the condition.
+
+```
+mysql-js> db.city.delete().where("Name = 'Olympia'")
+```
+
+### **Delete the First Record**
+
+To delete the first record in the city table, use the limit() method with a value of 1.
+
+```
+mysql-js> db.city.delete().limit(1)
+```
+
+### **Delete All Records in a Table**
+
+You can delete all records in a table. To do so, use the delete() method without specifying a search condition.
+
+![](_page_197_Picture_3.jpeg)
+
+### **Caution**
+
+Use care when you delete records without specifying a search condition; doing so deletes all records from the table.
+
+### **Drop a Table**
+
+The dropCollection() method is also used in MySQL Shell to drop a relational table from a database. For example, to drop the citytest table from the world\_x database, issue:
+
+```
+mysql-js> session.dropCollection("world_x", "citytest")
+```
+
+# **Related Information**
+
+- See [TableDeleteFunction](https://dev.mysql.com/doc/x-devapi-userguide/en/crud-ebnf-table-crud-functions.md#crud-ebnf-tabledeletefunction) for the full syntax definition.
+- See [Section 22.3.2, "Download and Import world\\_x Database"](#page-180-0) for instructions to recreate the world\_x database.
+
+# <span id="page-197-0"></span>**22.3.5 Documents in Tables**
+
+In MySQL, a table may contain traditional relational data, JSON values, or both. You can combine traditional data with JSON documents by storing the documents in columns having a native JSON data type.
+
+Examples in this section use the city table in the world\_x schema.
+
+## **city Table Description**
+
+The city table has five columns (or fields).
+
+|             |          |            |     |                 | +++++++            |
+|-------------|----------|------------|-----|-----------------|--------------------|
+| Field       | Type     | Null   Key |     | Default   Extra | <br>+++++++        |
+| ID          | int(11)  | NO         | PRI | null            | auto_increment<br> |
+| Name        | char(35) | NO         |     |                 | <br>               |
+| CountryCode | char(3)  | NO         |     |                 | <br>               |
+| District    | char(20) | NO         |     |                 | <br>               |
+| Info        | json     | YES        |     | null            | <br>               |
+|             |          |            |     |                 | +++++++            |
+
+# **Insert a Record**
+
+To insert a document into the column of a table, pass to the values() method a well-formed JSON document in the correct order. In the following example, a document is passed as the final value to be inserted into the Info column.
+
+```
+mysql-js> db.city.insert().values(
+None, "San Francisco", "USA", "California", '{"Population":830000}')
+```
+
+# **Select a Record**
+
+You can issue a query with a search condition that evaluates document values in the expression.
+
+```
+mysql-js> db.city.select(["ID", "Name", "CountryCode", "District", "Info"]).where(
+"CountryCode = :country and Info->'$.Population' > 1000000").bind(
+'country', 'USA')
++------+----------------+-------------+----------------+-----------------------------+
+| ID | Name | CountryCode | District | Info |
+```
+
+```
++------+----------------+-------------+----------------+-----------------------------+
+| 3793 | New York | USA | New York | {"Population": 8008278} |
+| 3794 | Los Angeles | USA | California | {"Population": 3694820} |
+| 3795 | Chicago | USA | Illinois | {"Population": 2896016} |
+| 3796 | Houston | USA | Texas | {"Population": 1953631} |
+| 3797 | Philadelphia | USA | Pennsylvania | {"Population": 1517550} |
+| 3798 | Phoenix | USA | Arizona | {"Population": 1321045} |
+| 3799 | San Diego | USA | California | {"Population": 1223400} |
+| 3800 | Dallas | USA | Texas | {"Population": 1188580} |
+| 3801 | San Antonio | USA | Texas | {"Population": 1144646} |
++------+----------------+-------------+----------------+-----------------------------+
+9 rows in set (0.01 sec)
+```
+
+## **Related Information**
+
+- See [Working with Relational Tables and Documents](https://dev.mysql.com/doc/x-devapi-userguide/en/devapi-users-working-with-relational-tables-and-documents.md) for more information.
+- See Section 13.5, "The JSON Data Type" for a detailed description of the data type.
+
+# <span id="page-198-0"></span>**22.4 Python Quick-Start Guide: MySQL Shell for Document Store**
+
+This quick-start guide provides instructions to begin prototyping document store applications interactively with MySQL Shell. The guide includes the following topics:
+
+- Introduction to MySQL functionality, MySQL Shell, and the world\_x example schema.
+- Operations to manage collections and documents.
+- Operations to manage relational tables.
+- Operations that apply to documents within tables.
+
+To follow this quick-start guide you need a MySQL server with X Plugin installed, the default in 8.4, and MySQL Shell to use as the client. MySQL Shell includes X DevAPI, implemented in both JavaScript and Python, which enables you to connect to the MySQL server instance using X Protocol and use the server as a Document Store.
+
+# **Related Information**
+
+- [MySQL Shell 8.4](https://dev.mysql.com/doc/mysql-shell/8.4/en/) provides more in-depth information about MySQL Shell.
+- See [Installing MySQL Shell](https://dev.mysql.com/doc/mysql-shell/8.4/en/mysql-shell-install.md) and Section 22.5, "X Plugin" for more information about the tools used in this quick-start guide.
+- See [Supported Languages](https://dev.mysql.com/doc/mysql-shell/8.4/en/mysql-shell-features.md#shell-supported-languages) for more information about the languages MySQL Shell supports.
+- [X DevAPI User Guide](https://dev.mysql.com/doc/x-devapi-userguide/en/) provides more examples of using X DevAPI to develop applications which use MySQL as a Document Store.
+- A [JavaScript](#page-178-0) quick-start guide is also available.
+
+# <span id="page-198-1"></span>**22.4.1 MySQL Shell**
+
+This quick-start guide assumes a certain level of familiarity with MySQL Shell. The following section is a high level overview, see the MySQL Shell documentation for more information. MySQL Shell is a unified scripting interface to MySQL Server. It supports scripting in JavaScript and Python. JavaScript is the default processing mode.
+
+## **Start MySQL Shell**
+
+After you have installed and started MySQL server, connect MySQL Shell to the server instance. You need to know the address of the MySQL server instance you plan to connect to. To be able to use the instance as a Document Store, the server instance must have X Plugin installed and you should
+
+connect to the server using X Protocol. For example to connect to the instance ds1.example.com on the default X Protocol port of 33060 use the network string user@ds1.example.com:33060.
+
+![](_page_199_Picture_2.jpeg)
+
+#### **Tip**
+
+If you connect to the instance using classic MySQL protocol, for example by using the default port of 3306 instead of the mysqlx\_port, you cannot use the Document Store functionality shown in this tutorial. For example the db global object is not populated. To use the Document Store, always connect using X Protocol.
+
+If MySQL Shell is not already running, open a terminal window and issue:
+
+```
+mysqlsh user@ds1.example.com:33060/world_x
+```
+
+Alternatively, if MySQL Shell is already running use the \connect command by issuing:
+
+```
+\connect user@ds1.example.com:33060/world_x
+```
+
+You need to specify the address of the MySQL server instance which you want to connect MySQL Shell to. For example in the previous example:
+
+- user represents the user name of your MySQL account.
+- ds1.example.com is the hostname of the server instance running MySQL. Replace this with the hostname of the MySQL server instance you are using as a Document Store.
+- The default schema for this session is world\_x. For instructions on setting up the world\_x schema, see Section 22.4.2, "Download and Import world\_x Database".
+
+For more information, see Section 6.2.5, "Connecting to the Server Using URI-Like Strings or Key-Value Pairs".
+
+Once MySQL Shell opens, the mysql-js> prompt indicates that the active language for this session is JavaScript. To switch MySQL Shell to Python mode, use the \py command.
+
+```
+mysql-js> \py
+Switching to Python mode...
+mysql-py>
+```
+
+MySQL Shell supports input-line editing as follows:
+
+- **left-arrow** and **right-arrow** keys move horizontally within the current input line.
+- **up-arrow** and **down-arrow** keys move up and down through the set of previously entered lines.
+- **Backspace** deletes the character before the cursor and typing new characters enters them at the cursor position.
+- **Enter** sends the current input line to the server.
+
+## **Get Help for MySQL Shell**
+
+Type mysqlsh --help at the prompt of your command interpreter for a list of command-line options.
+
+```
+mysqlsh --help
+```
+
+Type \help at the MySQL Shell prompt for a list of available commands and their descriptions.
+
+```
+mysql-py> \help
+```
+
+Type \help followed by a command name for detailed help about an individual MySQL Shell command. For example, to view help on the \connect command, issue:
+
+```
+mysql-py> \help \connect
+```
+
+# **Quit MySQL Shell**
+
+To quit MySQL Shell, issue the following command:
+
+```
+mysql-py> \quit
+```
+
+# **Related Information**
+
+- See [Interactive Code Execution](https://dev.mysql.com/doc/mysql-shell/8.4/en/mysql-shell-interactive-code-execution.md) for an explanation of how interactive code execution works in MySQL Shell.
+- See [Getting Started with MySQL Shell](https://dev.mysql.com/doc/mysql-shell/8.4/en/mysql-shell-getting-started.md) to learn about session and connection alternatives.
+
+# <span id="page-0-0"></span>**22.4.2 Download and Import world\_x Database**
+
+As part of this quick-start guide, an example schema is provided which is referred to as the world\_x schema. Many of the examples demonstrate Document Store functionality using this schema. Start your MySQL server so that you can load the world\_x schema, then follow these steps:
+
+- 1. Download [world\\_x-db.zip.](http://downloads.mysql.com/docs/world_x-db.zip)
+- 2. Extract the installation archive to a temporary location such as /tmp/. Unpacking the archive results in a single file named world\_x.sql.
+- 3. Import the world\_x.sql file to your server. You can either:
+  - Start MySQL Shell in SQL mode and import the file by issuing:
+
+```
+mysqlsh -u root --sql --file /tmp/world_x-db/world_x.sql
+Enter password: ****
+```
+
+• Set MySQL Shell to SQL mode while it is running and source the schema file by issuing:
+
+```
+\sql
+Switching to SQL mode... Commands end with ;
+\source /tmp/world_x-db/world_x.sql
+```
+
+Replace /tmp/ with the path to the world\_x.sql file on your system. Enter your password if prompted. A non-root account can be used as long as the account has privileges to create new schemas.
+
+# **The world\_x Schema**
+
+The world\_x example schema contains the following JSON collection and relational tables:
+
+- Collection
+  - countryinfo: Information about countries in the world.
+- Tables
+  - country: Minimal information about countries of the world.
+  - city: Information about some of the cities in those countries.
+  - countrylanguage: Languages spoken in each country.
+
+# **Related Information**
+
+• [MySQL Shell Sessions](https://dev.mysql.com/doc/mysql-shell/8.4/en/mysql-shell-sessions.md) explains session types.

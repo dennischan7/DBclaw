@@ -1,0 +1,7 @@
+# Oracle 21c - TO_SINGLE_BYTE
+Source: https://docs.oracle.com/en/database/oracle/oracle-database/21/sqlrf/TO_SINGLE_BYTE.html
+
+[Previous](TO_NUMBER.md)
+[Next](TO_TIMESTAMP.md)
+
+JavaScript must be enabled to correctly display this content

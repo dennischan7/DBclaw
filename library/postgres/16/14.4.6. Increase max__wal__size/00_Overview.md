@@ -1,0 +1,6 @@
+---
+source: PostgreSQL 16 Reference
+title: 00_Overview
+---
+
+Temporarily increasing the max\_wal\_size configuration variable can also make large data loads faster. This is because loading a large amount of data into PostgreSQL will cause checkpoints to occur more often than the normal checkpoint frequency (specified by the checkpoint\_timeout configuration variable). Whenever a checkpoint occurs, all dirty pages must be flushed to disk. By increasing max\_wal\_size temporarily during bulk data loads, the number of checkpoints that are required can be reduced.

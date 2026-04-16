@@ -1,0 +1,24 @@
+---
+source: PostgreSQL 14 Reference
+title: 00_Overview
+---
+
+### **49.8.1. Overview**
+
+Logical decoding can be used to build synchronous replication solutions with the same user interface as synchronous replication for streaming replication. To do this, the streaming replication interface (see [Section 49.3](#page-74-0)) must be used to stream out data. Clients have to send Standby status update (F) (see Section 53.4) messages, just like streaming replication clients do.
+
+#### **Note**
+
+A synchronous replica receiving changes via logical decoding will work in the scope of a single database. Since, in contrast to that, synchronous\_standby\_names currently is server wide, this means this technique will not work properly if more than one database is actively used.
+
+### <span id="page-83-0"></span>**49.8.2. Caveats**
+
+In synchronous replication setup, a deadlock can happen, if the transaction has locked [user] catalog tables exclusively. See [Section 49.6.2](#page-75-0) for information on user catalog tables. This is because logical decoding of transactions can lock catalog tables to access them. To avoid this users must refrain from taking an exclusive lock on [user] catalog tables. This can happen in the following ways:
+
+- Issuing an explicit LOCK on pg\_class in a transaction.
+- Perform CLUSTER on pg\_class in a transaction.
+- PREPARE TRANSACTION after LOCK command on pg\_class and allow logical decoding of two-phase transactions.
+- PREPARE TRANSACTION after CLUSTER command on pg\_trigger and allow logical decoding of two-phase transactions. This will lead to deadlock only when published table have a trigger.
+- Executing TRUNCATE on [user] catalog table in a transaction.
+
+Note that these commands that can cause deadlock apply to not only explicitly indicated system catalog tables above but also to any other [user] catalog table.

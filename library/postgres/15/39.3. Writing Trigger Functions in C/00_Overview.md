@@ -1,0 +1,505 @@
+---
+source: PostgreSQL 15 Reference
+title: 00_Overview
+---
+
+This section describes the low-level details of the interface to a trigger function. This information is only needed when writing trigger functions in C. If you are using a higher-level language then these details are handled for you. In most cases you should consider using a procedural language before writing your triggers in C. The documentation of each procedural language explains how to write a trigger in that language.
+
+Trigger functions must use the "version 1" function manager interface.
+
+When a function is called by the trigger manager, it is not passed any normal arguments, but it is passed a "context" pointer pointing to a TriggerData structure. C functions can check whether they were called from the trigger manager or not by executing the macro:
+
+```
+CALLED_AS_TRIGGER(fcinfo)
+which expands to:
+((fcinfo)->context != NULL && IsA((fcinfo)->context, TriggerData))
+```
+
+If this returns true, then it is safe to cast fcinfo->context to type TriggerData \* and make use of the pointed-to TriggerData structure. The function must *not* alter the TriggerData structure or any of the data it points to.
+
+struct TriggerData is defined in commands/trigger.h:
+
+```
+typedef struct TriggerData
+{
+ NodeTag type;
+ TriggerEvent tg_event;
+ Relation tg_relation;
+ HeapTuple tg_trigtuple;
+ HeapTuple tg_newtuple;
+ Trigger *tg_trigger;
+ TupleTableSlot *tg_trigslot;
+ TupleTableSlot *tg_newslot;
+ Tuplestorestate *tg_oldtable;
+ Tuplestorestate *tg_newtable;
+ const Bitmapset *tg_updatedcols;
+} TriggerData;
+```
+
+where the members are defined as follows:
+
+```
+type
+   Always T_TriggerData.
+tg_event
+```
+
+Describes the event for which the function is called. You can use the following macros to examine tg\_event:
+
+```
+TRIGGER_FIRED_BEFORE(tg_event)
+```
+
+Returns true if the trigger fired before the operation.
+
+```
+TRIGGER_FIRED_AFTER(tg_event)
+```
+
+Returns true if the trigger fired after the operation.
+
+```
+TRIGGER_FIRED_INSTEAD(tg_event)
+```
+
+Returns true if the trigger fired instead of the operation.
+
+```
+TRIGGER_FIRED_FOR_ROW(tg_event)
+```
+
+Returns true if the trigger fired for a row-level event.
+
+```
+TRIGGER_FIRED_FOR_STATEMENT(tg_event)
+```
+
+Returns true if the trigger fired for a statement-level event.
+
+```
+TRIGGER_FIRED_BY_INSERT(tg_event)
+```
+
+Returns true if the trigger was fired by an INSERT command.
+
+```
+TRIGGER_FIRED_BY_UPDATE(tg_event)
+```
+
+Returns true if the trigger was fired by an UPDATE command.
+
+```
+TRIGGER_FIRED_BY_DELETE(tg_event)
+```
+
+Returns true if the trigger was fired by a DELETE command.
+
+```
+TRIGGER_FIRED_BY_TRUNCATE(tg_event)
+```
+
+Returns true if the trigger was fired by a TRUNCATE command.
+
+```
+tg_relation
+```
+
+A pointer to a structure describing the relation that the trigger fired for. Look at utils/rel.h for details about this structure. The most interesting things are tg\_relation->rd\_att (descriptor of the relation tuples) and tg\_relation->rd\_rel->relname (relation name; the type is not char\* but NameData; use SPI\_getrelname(tg\_relation) to get a char\* if you need a copy of the name).
+
+```
+tg_trigtuple
+```
+
+A pointer to the row for which the trigger was fired. This is the row being inserted, updated, or deleted. If this trigger was fired for an INSERT or DELETE then this is what you should return from the function if you don't want to replace the row with a different one (in the case of INSERT) or skip the operation. For triggers on foreign tables, values of system columns herein are unspecified.
+
+```
+tg_newtuple
+```
+
+A pointer to the new version of the row, if the trigger was fired for an UPDATE, and NULL if it is for an INSERT or a DELETE. This is what you have to return from the function if the event is an UPDATE and you don't want to replace this row by a different one or skip the operation. For triggers on foreign tables, values of system columns herein are unspecified.
+
+```
+tg_trigger
+```
+
+A pointer to a structure of type Trigger, defined in utils/reltrigger.h:
+
+```
+typedef struct Trigger
+{
+ Oid tgoid;
+ char *tgname;
+ Oid tgfoid;
+ int16 tgtype;
+ char tgenabled;
+ bool tgisinternal;
+```
+
+```
+ bool tgisclone;
+ Oid tgconstrrelid;
+ Oid tgconstrindid;
+ Oid tgconstraint;
+ bool tgdeferrable;
+ bool tginitdeferred;
+ int16 tgnargs;
+ int16 tgnattr;
+ int16 *tgattr;
+ char **tgargs;
+ char *tgqual;
+ char *tgoldtable;
+ char *tgnewtable;
+} Trigger;
+```
+
+where tgname is the trigger's name, tgnargs is the number of arguments in tgargs, and tgargs is an array of pointers to the arguments specified in the CREATE TRIGGER statement. The other members are for internal use only.
+
+```
+tg_trigslot
+```
+
+The slot containing tg\_trigtuple, or a NULL pointer if there is no such tuple.
+
+```
+tg_newslot
+```
+
+The slot containing tg\_newtuple, or a NULL pointer if there is no such tuple.
+
+```
+tg_oldtable
+```
+
+A pointer to a structure of type Tuplestorestate containing zero or more rows in the format specified by tg\_relation, or a NULL pointer if there is no OLD TABLE transition relation.
+
+```
+tg_newtable
+```
+
+A pointer to a structure of type Tuplestorestate containing zero or more rows in the format specified by tg\_relation, or a NULL pointer if there is no NEW TABLE transition relation.
+
+```
+tg_updatedcols
+```
+
+For UPDATE triggers, a bitmap set indicating the columns that were updated by the triggering command. Generic trigger functions can use this to optimize actions by not having to deal with columns that were not changed.
+
+As an example, to determine whether a column with attribute number attnum (1-based) is a member of this bitmap set, call bms\_is\_member(attnum - FirstLowInvalidHeap-AttributeNumber, trigdata->tg\_updatedcols)).
+
+For triggers other than UPDATE triggers, this will be NULL.
+
+To allow queries issued through SPI to reference transition tables, see SPI\_register\_trigger\_data.
+
+A trigger function must return either a HeapTuple pointer or a NULL pointer (*not* an SQL null value, that is, do not set isNull true). Be careful to return either tg\_trigtuple or tg\_newtuple, as appropriate, if you don't want to modify the row being operated on.
+
+# <span id="page-68-0"></span>**39.4. A Complete Trigger Example**
+
+Here is a very simple example of a trigger function written in C. (Examples of triggers written in procedural languages can be found in the documentation of the procedural languages.)
+
+The function trigf reports the number of rows in the table ttest and skips the actual operation if the command attempts to insert a null value into the column x. (So the trigger acts as a not-null constraint but doesn't abort the transaction.)
+
+First, the table definition:
+
+```
+CREATE TABLE ttest (
+ x integer
+);
+```
+
+This is the source code of the trigger function:
+
+```
+#include "postgres.h"
+#include "fmgr.h"
+#include "executor/spi.h" /* this is what you need to work
+ with SPI */
+#include "commands/trigger.h" /* ... triggers ... */
+#include "utils/rel.h" /* ... and relations */
+PG_MODULE_MAGIC;
+PG_FUNCTION_INFO_V1(trigf);
+Datum
+trigf(PG_FUNCTION_ARGS)
+{
+ TriggerData *trigdata = (TriggerData *) fcinfo->context;
+ TupleDesc tupdesc;
+ HeapTuple rettuple;
+ char *when;
+ bool checknull = false;
+ bool isnull;
+ int ret, i;
+ /* make sure it's called as a trigger at all */
+ if (!CALLED_AS_TRIGGER(fcinfo))
+ elog(ERROR, "trigf: not called by trigger manager");
+ /* tuple to return to executor */
+ if (TRIGGER_FIRED_BY_UPDATE(trigdata->tg_event))
+ rettuple = trigdata->tg_newtuple;
+ else
+ rettuple = trigdata->tg_trigtuple;
+ /* check for null values */
+ if (!TRIGGER_FIRED_BY_DELETE(trigdata->tg_event)
+ && TRIGGER_FIRED_BEFORE(trigdata->tg_event))
+ checknull = true;
+ if (TRIGGER_FIRED_BEFORE(trigdata->tg_event))
+ when = "before";
+ else
+ when = "after ";
+ tupdesc = trigdata->tg_relation->rd_att;
+ /* connect to SPI manager */
+```
+
+```
+ if ((ret = SPI_connect()) < 0)
+ elog(ERROR, "trigf (fired %s): SPI_connect returned %d",
+ when, ret);
+ /* get number of rows in table */
+ ret = SPI_exec("SELECT count(*) FROM ttest", 0);
+ if (ret < 0)
+ elog(ERROR, "trigf (fired %s): SPI_exec returned %d", when,
+ ret);
+ /* count(*) returns int8, so be careful to convert */
+ i = DatumGetInt64(SPI_getbinval(SPI_tuptable->vals[0],
+ SPI_tuptable->tupdesc,
+ 1,
+ &isnull));
+ elog (INFO, "trigf (fired %s): there are %d rows in ttest",
+ when, i);
+ SPI_finish();
+ if (checknull)
+ {
+ SPI_getbinval(rettuple, tupdesc, 1, &isnull);
+ if (isnull)
+ rettuple = NULL;
+ }
+ return PointerGetDatum(rettuple);
+}
+After you have compiled the source code (see Section 38.10.5), declare the function and the triggers:
+CREATE FUNCTION trigf() RETURNS trigger
+ AS 'filename'
+ LANGUAGE C;
+CREATE TRIGGER tbefore BEFORE INSERT OR UPDATE OR DELETE ON ttest
+ FOR EACH ROW EXECUTE FUNCTION trigf();
+CREATE TRIGGER tafter AFTER INSERT OR UPDATE OR DELETE ON ttest
+ FOR EACH ROW EXECUTE FUNCTION trigf();
+Now you can test the operation of the trigger:
+=> INSERT INTO ttest VALUES (NULL);
+INFO: trigf (fired before): there are 0 rows in ttest
+INSERT 0 0
+-- Insertion skipped and AFTER trigger is not fired
+=> SELECT * FROM ttest;
+ x
+---
+(0 rows)
+```
+
+```
+=> INSERT INTO ttest VALUES (1);
+INFO: trigf (fired before): there are 0 rows in ttest
+INFO: trigf (fired after ): there are 1 rows in ttest
+ ^^^^^^^^
+ remember what we said about
+ visibility.
+INSERT 167793 1
+vac=> SELECT * FROM ttest;
+ x
+---
+ 1
+(1 row)
+=> INSERT INTO ttest SELECT x * 2 FROM ttest;
+INFO: trigf (fired before): there are 1 rows in ttest
+INFO: trigf (fired after ): there are 2 rows in ttest
+ ^^^^^^
+ remember what we said about
+ visibility.
+INSERT 167794 1
+=> SELECT * FROM ttest;
+ x
+---
+ 1
+ 2
+(2 rows)
+=> UPDATE ttest SET x = NULL WHERE x = 2;
+INFO: trigf (fired before): there are 2 rows in ttest
+UPDATE 0
+=> UPDATE ttest SET x = 4 WHERE x = 2;
+INFO: trigf (fired before): there are 2 rows in ttest
+INFO: trigf (fired after ): there are 2 rows in ttest
+UPDATE 1
+vac=> SELECT * FROM ttest;
+ x
+---
+ 1
+ 4
+(2 rows)
+=> DELETE FROM ttest;
+INFO: trigf (fired before): there are 2 rows in ttest
+INFO: trigf (fired before): there are 1 rows in ttest
+INFO: trigf (fired after ): there are 0 rows in ttest
+INFO: trigf (fired after ): there are 0 rows in ttest
+ ^^^^^^
+ remember what we said about
+ visibility.
+DELETE 2
+=> SELECT * FROM ttest;
+ x
+---
+(0 rows)
+```
+
+There are more complex examples in src/test/regress/regress.c and in spi.
+
+# <span id="page-72-1"></span>**Chapter 40. Event Triggers**
+
+To supplement the trigger mechanism discussed in [Chapter 39,](#page-62-0) PostgreSQL also provides event triggers. Unlike regular triggers, which are attached to a single table and capture only DML events, event triggers are global to a particular database and are capable of capturing DDL events.
+
+Like regular triggers, event triggers can be written in any procedural language that includes event trigger support, or in C, but not in plain SQL.
+
+# <span id="page-72-0"></span>**40.1. Overview of Event Trigger Behavior**
+
+An event trigger fires whenever the event with which it is associated occurs in the database in which it is defined. Currently, the only supported events are ddl\_command\_start, ddl\_command\_end, table\_rewrite and sql\_drop. Support for additional events may be added in future releases.
+
+The ddl\_command\_start event occurs just before the execution of a CREATE, ALTER, DROP, SECURITY LABEL, COMMENT, GRANT or REVOKE command. No check whether the affected object exists or doesn't exist is performed before the event trigger fires. As an exception, however, this event does not occur for DDL commands targeting shared objects — databases, roles, and tablespaces or for commands targeting event triggers themselves. The event trigger mechanism does not support these object types. ddl\_command\_start also occurs just before the execution of a SELECT INTO command, since this is equivalent to CREATE TABLE AS.
+
+The ddl\_command\_end event occurs just after the execution of this same set of commands. To obtain more details on the DDL operations that took place, use the set-returning function pg\_event\_trigger\_ddl\_commands() from the ddl\_command\_end event trigger code (see Section 9.29). Note that the trigger fires after the actions have taken place (but before the transaction commits), and thus the system catalogs can be read as already changed.
+
+The sql\_drop event occurs just before the ddl\_command\_end event trigger for any operation that drops database objects. To list the objects that have been dropped, use the set-returning function pg\_event\_trigger\_dropped\_objects() from the sql\_drop event trigger code (see Section 9.29). Note that the trigger is executed after the objects have been deleted from the system catalogs, so it's not possible to look them up anymore.
+
+The table\_rewrite event occurs just before a table is rewritten by some actions of the commands ALTER TABLE and ALTER TYPE. While other control statements are available to rewrite a table, like CLUSTER and VACUUM, the table\_rewrite event is not triggered by them. To find the OID of the table that was rewritten, use the function pg\_event\_trigger\_table\_rewrite\_oid() (see Section 9.29). To discover the reason(s) for the rewrite, use the function pg\_event\_trigger\_table\_rewrite\_reason().
+
+Event triggers (like other functions) cannot be executed in an aborted transaction. Thus, if a DDL command fails with an error, any associated ddl\_command\_end triggers will not be executed. Conversely, if a ddl\_command\_start trigger fails with an error, no further event triggers will fire, and no attempt will be made to execute the command itself. Similarly, if a ddl\_command\_end trigger fails with an error, the effects of the DDL statement will be rolled back, just as they would be in any other case where the containing transaction aborts.
+
+For a complete list of commands supported by the event trigger mechanism, see [Section 40.2](#page-73-0).
+
+Event triggers are created using the command CREATE EVENT TRIGGER. In order to create an event trigger, you must first create a function with the special return type event\_trigger. This function need not (and may not) return a value; the return type serves merely as a signal that the function is to be invoked as an event trigger.
+
+If more than one event trigger is defined for a particular event, they will fire in alphabetical order by trigger name.
+
+A trigger definition can also specify a WHEN condition so that, for example, a ddl\_command\_start trigger can be fired only for particular commands which the user wishes to intercept. A common use of such triggers is to restrict the range of DDL operations which users may perform.
+
+# <span id="page-73-1"></span><span id="page-73-0"></span>**40.2. Event Trigger Firing Matrix**
+
+[Table 40.1](#page-73-1) lists all commands for which event triggers are supported.
+
+**Table 40.1. Event Trigger Support by Command Tag**
+
+| Command Tag                        | ddl_com<br>mand_<br>start | ddl_com<br>mand_end | sql_drop | table_<br>rewrite | Notes |
+|------------------------------------|---------------------------|---------------------|----------|-------------------|-------|
+| ALTER AGGREGATE                    | X                         | X                   | -        | -                 |       |
+| ALTER COLLATION                    | X                         | X                   | -        | -                 |       |
+| ALTER CONVERSION                   | X                         | X                   | -        | -                 |       |
+| ALTER DOMAIN                       | X                         | X                   | -        | -                 |       |
+| ALTER DEFAULT<br>PRIVILEGES        | X                         | X                   | -        | -                 |       |
+| ALTER EXTENSION                    | X                         | X                   | -        | -                 |       |
+| ALTER FOREIGN DATA<br>WRAPPER      | X                         | X                   | -        | -                 |       |
+| ALTER FOREIGN TA<br>BLE            | X                         | X                   | X        | -                 |       |
+| ALTER FUNCTION                     | X                         | X                   | -        | -                 |       |
+| ALTER LANGUAGE                     | X                         | X                   | -        | -                 |       |
+| ALTER LARGE OBJECT                 | X                         | X                   | -        | -                 |       |
+| ALTER MATERIALIZED<br>VIEW         | X                         | X                   | -        | X                 |       |
+| ALTER OPERATOR                     | X                         | X                   | -        | -                 |       |
+| ALTER OPERATOR<br>CLASS            | X                         | X                   | -        | -                 |       |
+| ALTER OPERATOR<br>FAMILY           | X                         | X                   | -        | -                 |       |
+| ALTER POLICY                       | X                         | X                   | -        | -                 |       |
+| ALTER PROCEDURE                    | X                         | X                   | -        | -                 |       |
+| ALTER PUBLICATION                  | X                         | X                   | -        | -                 |       |
+| ALTER ROUTINE                      | X                         | X                   | -        | -                 |       |
+| ALTER SCHEMA                       | X                         | X                   | -        | -                 |       |
+| ALTER SEQUENCE                     | X                         | X                   | -        | -                 |       |
+| ALTER SERVER                       | X                         | X                   | -        | -                 |       |
+| ALTER STATISTICS                   | X                         | X                   | -        | -                 |       |
+| ALTER SUBSCRIPTION                 | X                         | X                   | -        | -                 |       |
+| ALTER TABLE                        | X                         | X                   | X        | X                 |       |
+| ALTER TEXT SEARCH<br>CONFIGURATION | X                         | X                   | -        | -                 |       |
+
+| Command Tag                     | ddl_com<br>mand_<br>start | ddl_com<br>mand_end | sql_drop | table_<br>rewrite | Notes                      |
+|---------------------------------|---------------------------|---------------------|----------|-------------------|----------------------------|
+| ALTER TEXT SEARCH<br>DICTIONARY | X                         | X                   | -        | -                 |                            |
+| ALTER TEXT SEARCH<br>PARSER     | X                         | X                   | -        | -                 |                            |
+| ALTER TEXT SEARCH<br>TEMPLATE   | X                         | X                   | -        | -                 |                            |
+| ALTER TRIGGER                   | X                         | X                   | -        | -                 |                            |
+| ALTER TYPE                      | X                         | X                   | -        | X                 |                            |
+| ALTER USER MAPPING              | X                         | X                   | -        | -                 |                            |
+| ALTER VIEW                      | X                         | X                   | -        | -                 |                            |
+| COMMENT                         | X                         | X                   | -        | -                 | Only for lo<br>cal objects |
+| CREATE ACCESS<br>METHOD         | X                         | X                   | -        | -                 |                            |
+| CREATE AGGREGATE                | X                         | X                   | -        | -                 |                            |
+| CREATE CAST                     | X                         | X                   | -        | -                 |                            |
+| CREATE COLLATION                | X                         | X                   | -        | -                 |                            |
+| CREATE CONVERSION               | X                         | X                   | -        | -                 |                            |
+| CREATE DOMAIN                   | X                         | X                   | -        | -                 |                            |
+| CREATE EXTENSION                | X                         | X                   | -        | -                 |                            |
+| CREATE FOREIGN DA<br>TA WRAPPER | X                         | X                   | -        | -                 |                            |
+| CREATE FOREIGN TA<br>BLE        | X                         | X                   | -        | -                 |                            |
+| CREATE FUNCTION                 | X                         | X                   | -        | -                 |                            |
+| CREATE INDEX                    | X                         | X                   | -        | -                 |                            |
+| CREATE LANGUAGE                 | X                         | X                   | -        | -                 |                            |
+| CREATE<br>MATERIALIZED VIEW     | X                         | X                   | -        | -                 |                            |
+| CREATE OPERATOR                 | X                         | X                   | -        | -                 |                            |
+| CREATE OPERATOR<br>CLASS        | X                         | X                   | -        | -                 |                            |
+| CREATE OPERATOR<br>FAMILY       | X                         | X                   | -        | -                 |                            |
+| CREATE POLICY                   | X                         | X                   | -        | -                 |                            |
+| CREATE PROCEDURE                | X                         | X                   | -        | -                 |                            |
+| CREATE PUBLICATION              | X                         | X                   | -        | -                 |                            |
+| CREATE RULE                     | X                         | X                   | -        | -                 |                            |
+| CREATE SCHEMA                   | X                         | X                   | -        | -                 |                            |
+| CREATE SEQUENCE                 | X                         | X                   | -        | -                 |                            |
+| CREATE SERVER                   | X                         | X                   | -        | -                 |                            |
+| CREATE STATISTICS               | X                         | X                   | -        | -                 |                            |
+
+| Command Tag                         | ddl_com<br>mand_<br>start | ddl_com<br>mand_end | sql_drop | table_<br>rewrite | Notes |
+|-------------------------------------|---------------------------|---------------------|----------|-------------------|-------|
+| CREATE SUBSCRIP<br>TION             | X                         | X                   | -        | -                 |       |
+| CREATE TABLE                        | X                         | X                   | -        | -                 |       |
+| CREATE TABLE AS                     | X                         | X                   | -        | -                 |       |
+| CREATE TEXT SEARCH<br>CONFIGURATION | X                         | X                   | -        | -                 |       |
+| CREATE TEXT SEARCH<br>DICTIONARY    | X                         | X                   | -        | -                 |       |
+| CREATE TEXT SEARCH<br>PARSER        | X                         | X                   | -        | -                 |       |
+| CREATE TEXT SEARCH<br>TEMPLATE      | X                         | X                   | -        | -                 |       |
+| CREATE TRIGGER                      | X                         | X                   | -        | -                 |       |
+| CREATE TYPE                         | X                         | X                   | -        | -                 |       |
+| CREATE USER MAP<br>PING             | X                         | X                   | -        | -                 |       |
+| CREATE VIEW                         | X                         | X                   | -        | -                 |       |
+| DROP ACCESS METHOD                  | X                         | X                   | X        | -                 |       |
+| DROP AGGREGATE                      | X                         | X                   | X        | -                 |       |
+| DROP CAST                           | X                         | X                   | X        | -                 |       |
+| DROP COLLATION                      | X                         | X                   | X        | -                 |       |
+| DROP CONVERSION                     | X                         | X                   | X        | -                 |       |
+| DROP DOMAIN                         | X                         | X                   | X        | -                 |       |
+| DROP EXTENSION                      | X                         | X                   | X        | -                 |       |
+| DROP FOREIGN DATA<br>WRAPPER        | X                         | X                   | X        | -                 |       |
+| DROP FOREIGN TABLE                  | X                         | X                   | X        | -                 |       |
+| DROP FUNCTION                       | X                         | X                   | X        | -                 |       |
+| DROP INDEX                          | X                         | X                   | X        | -                 |       |
+| DROP LANGUAGE                       | X                         | X                   | X        | -                 |       |
+| DROP MATERIALIZED<br>VIEW           | X                         | X                   | X        | -                 |       |
+| DROP OPERATOR                       | X                         | X                   | X        | -                 |       |
+| DROP OPERATOR<br>CLASS              | X                         | X                   | X        | -                 |       |
+| DROP OPERATOR<br>FAMILY             | X                         | X                   | X        | -                 |       |
+| DROP OWNED                          | X                         | X                   | X        | -                 |       |
+| DROP POLICY                         | X                         | X                   | X        | -                 |       |
+| DROP PROCEDURE                      | X                         | X                   | X        | -                 |       |
+| DROP PUBLICATION                    | X                         | X                   | X        | -                 |       |
+| DROP ROUTINE                        | X                         | X                   | X        | -                 |       |
+
+| Command Tag                       | ddl_com<br>mand_<br>start | ddl_com<br>mand_end | sql_drop | table_<br>rewrite | Notes                      |
+|-----------------------------------|---------------------------|---------------------|----------|-------------------|----------------------------|
+| DROP RULE                         | X                         | X                   | X        | -                 |                            |
+| DROP SCHEMA                       | X                         | X                   | X        | -                 |                            |
+| DROP SEQUENCE                     | X                         | X                   | X        | -                 |                            |
+| DROP SERVER                       | X                         | X                   | X        | -                 |                            |
+| DROP STATISTICS                   | X                         | X                   | X        | -                 |                            |
+| DROP SUBSCRIPTION                 | X                         | X                   | X        | -                 |                            |
+| DROP TABLE                        | X                         | X                   | X        | -                 |                            |
+| DROP TEXT SEARCH<br>CONFIGURATION | X                         | X                   | X        | -                 |                            |
+| DROP TEXT SEARCH<br>DICTIONARY    | X                         | X                   | X        | -                 |                            |
+| DROP TEXT SEARCH<br>PARSER        | X                         | X                   | X        | -                 |                            |
+| DROP TEXT SEARCH<br>TEMPLATE      | X                         | X                   | X        | -                 |                            |
+| DROP TRIGGER                      | X                         | X                   | X        | -                 |                            |
+| DROP TYPE                         | X                         | X                   | X        | -                 |                            |
+| DROP USER MAPPING                 | X                         | X                   | X        | -                 |                            |
+| DROP VIEW                         | X                         | X                   | X        | -                 |                            |
+| GRANT                             | X                         | X                   | -        | -                 | Only for lo<br>cal objects |
+| IMPORT FOREIGN<br>SCHEMA          | X                         | X                   | -        | -                 |                            |
+| REFRESH<br>MATERIALIZED VIEW      | X                         | X                   | -        | -                 |                            |
+| REVOKE                            | X                         | X                   | -        | -                 | Only for lo<br>cal objects |
+| SECURITY LABEL                    | X                         | X                   | -        | -                 | Only for lo<br>cal objects |
+| SELECT INTO                       | X                         | X                   | -        | -                 |                            |

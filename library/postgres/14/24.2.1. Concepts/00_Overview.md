@@ -1,0 +1,76 @@
+---
+source: PostgreSQL 14 Reference
+title: 00_Overview
+---
+
+Conceptually, every expression of a collatable data type has a collation. (The built-in collatable data types are text, varchar, and char. User-defined base types can also be marked collatable, and of course a domain over a collatable data type is collatable.) If the expression is a column reference, the collation of the expression is the defined collation of the column. If the expression is a constant, the collation is the default collation of the data type of the constant. The collation of a more complex expression is derived from the collations of its inputs, as described below.
+
+The collation of an expression can be the "default" collation, which means the locale settings defined for the database. It is also possible for an expression's collation to be indeterminate. In such cases, ordering operations and other operations that need to know the collation will fail.
+
+When the database system has to perform an ordering or a character classification, it uses the collation of the input expression. This happens, for example, with ORDER BY clauses and function or operator calls such as <. The collation to apply for an ORDER BY clause is simply the collation of the sort key. The collation to apply for a function or operator call is derived from the arguments, as described below. In addition to comparison operators, collations are taken into account by functions that convert between lower and upper case letters, such as lower, upper, and initcap; by pattern matching operators; and by to\_char and related functions.
+
+For a function or operator call, the collation that is derived by examining the argument collations is used at run time for performing the specified operation. If the result of the function or operator call is of a collatable data type, the collation is also used at parse time as the defined collation of the function or operator expression, in case there is a surrounding expression that requires knowledge of its collation.
+
+The *collation derivation* of an expression can be implicit or explicit. This distinction affects how collations are combined when multiple different collations appear in an expression. An explicit collation derivation occurs when a COLLATE clause is used; all other collation derivations are implicit. When multiple collations need to be combined, for example in a function call, the following rules are used:
+
+- 1. If any input expression has an explicit collation derivation, then all explicitly derived collations among the input expressions must be the same, otherwise an error is raised. If any explicitly derived collation is present, that is the result of the collation combination.
+- 2. Otherwise, all input expressions must have the same implicit collation derivation or the default collation. If any non-default collation is present, that is the result of the collation combination. Otherwise, the result is the default collation.
+- 3. If there are conflicting non-default implicit collations among the input expressions, then the combination is deemed to have indeterminate collation. This is not an error condition unless the particular function being invoked requires knowledge of the collation it should apply. If it does, an error will be raised at run-time.
+
+For example, consider this table definition:
+
+```
+CREATE TABLE test1 (
+ a text COLLATE "de_DE",
+ b text COLLATE "es_ES",
+ ...
+);
+Then in
+SELECT a < 'foo' FROM test1;
+```
+
+the < comparison is performed according to de\_DE rules, because the expression combines an implicitly derived collation with the default collation. But in
+
+```
+SELECT a < ('foo' COLLATE "fr_FR") FROM test1;
+```
+
+the comparison is performed using fr\_FR rules, because the explicit collation derivation overrides the implicit one. Furthermore, given
+
+```
+SELECT a < b FROM test1;
+```
+
+the parser cannot determine which collation to apply, since the a and b columns have conflicting implicit collations. Since the < operator does need to know which collation to use, this will result in an error. The error can be resolved by attaching an explicit collation specifier to either input expression, thus:
+
+```
+SELECT a < b COLLATE "de_DE" FROM test1;
+or equivalently
+SELECT a COLLATE "de_DE" < b FROM test1;
+```
+
+On the other hand, the structurally similar case
+
+```
+SELECT a || b FROM test1;
+```
+
+does not result in an error, because the || operator does not care about collations: its result is the same regardless of the collation.
+
+The collation assigned to a function or operator's combined input expressions is also considered to apply to the function or operator's result, if the function or operator delivers a result of a collatable data type. So, in
+
+```
+SELECT * FROM test1 ORDER BY a || 'foo';
+```
+
+the ordering will be done according to de\_DE rules. But this query:
+
+```
+SELECT * FROM test1 ORDER BY a || b;
+```
+
+results in an error, because even though the || operator doesn't need to know a collation, the ORDER BY clause does. As before, the conflict can be resolved with an explicit collation specifier:
+
+```
+SELECT * FROM test1 ORDER BY a || b COLLATE "fr_FR";
+```

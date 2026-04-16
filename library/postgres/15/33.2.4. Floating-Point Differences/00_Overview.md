@@ -1,0 +1,10 @@
+---
+source: PostgreSQL 15 Reference
+title: 00_Overview
+---
+
+Some of the tests involve computing 64-bit floating-point numbers (double precision) from table columns. Differences in results involving mathematical functions of double precision columns have been observed. The float8 and geometry tests are particularly prone to small differences across platforms, or even with different compiler optimization settings. Human eyeball comparison is needed to determine the real significance of these differences which are usually 10 places to the right of the decimal point.
+
+Some systems display minus zero as -0, while others just show 0.
+
+Some systems signal errors from pow() and exp() differently from the mechanism expected by the current PostgreSQL code.

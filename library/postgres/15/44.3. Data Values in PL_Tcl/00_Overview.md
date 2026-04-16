@@ -1,0 +1,6 @@
+---
+source: PostgreSQL 15 Reference
+title: 00_Overview
+---
+
+The argument values supplied to a PL/Tcl function's code are simply the input arguments converted to text form (just as if they had been displayed by a SELECT statement). Conversely, the return and return\_next commands will accept any string that is acceptable input format for the function's declared result type, or for the specified column of a composite result type.

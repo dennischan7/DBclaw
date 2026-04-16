@@ -1,0 +1,70 @@
+---
+source: PostgreSQL 15 Reference
+title: 00_Overview
+---
+
+The make check and make installcheck commands run only the "core" regression tests, which test built-in functionality of the PostgreSQL server. The source distribution contains many additional test suites, most of them having to do with add-on functionality such as optional procedural languages.
+
+To run all test suites applicable to the modules that have been selected to be built, including the core tests, type one of these commands at the top of the build tree:
+
+```
+make check-world
+make installcheck-world
+```
+
+These commands run the tests using temporary servers or an already-installed server, respectively, just as previously explained for make check and make installcheck. Other considerations are the same as previously explained for each method. Note that make check-world builds a separate instance (temporary data directory) for each tested module, so it requires more time and disk space than make installcheck-world.
+
+On a modern machine with multiple CPU cores and no tight operating-system limits, you can make things go substantially faster with parallelism. The recipe that most PostgreSQL developers actually use for running all tests is something like
+
+```
+make check-world -j8 >/dev/null
+```
+
+with a -j limit near to or a bit more than the number of available cores. Discarding stdout eliminates chatter that's not interesting when you just want to verify success. (In case of failure, the stderr messages are usually enough to determine where to look closer.)
+
+Alternatively, you can run individual test suites by typing make check or make installcheck in the appropriate subdirectory of the build tree. Keep in mind that make installcheck assumes you've installed the relevant module(s), not only the core server.
+
+The additional tests that can be invoked this way include:
+
+- Regression tests for optional procedural languages. These are located under src/pl.
+- Regression tests for contrib modules, located under contrib. Not all contrib modules have tests.
+- Regression tests for the interface libraries, located in src/interfaces/libpq/test and src/interfaces/ecpg/test.
+- Tests for core-supported authentication methods, located in src/test/authentication. (See below for additional authentication-related tests.)
+- Tests stressing behavior of concurrent sessions, located in src/test/isolation.
+- Tests for crash recovery and physical replication, located in src/test/recovery.
+- Tests for logical replication, located in src/test/subscription.
+- Tests of client programs, located under src/bin.
+
+When using installcheck mode, these tests will create and destroy test databases whose names include regression, for example pl\_regression or contrib\_regression. Beware of using installcheck mode with an installation that has any non-test databases named that way.
+
+Some of these auxiliary test suites use the TAP infrastructure explained in [Section 33.4.](#page-102-0) The TAPbased tests are run only when PostgreSQL was configured with the option --enable-tap-tests. This is recommended for development, but can be omitted if there is no suitable Perl installation.
+
+Some test suites are not run by default, either because they are not secure to run on a multiuser system, because they require special software or because they are resource intensive. You can decide which test suites to run additionally by setting the make or environment variable PG\_TEST\_EXTRA to a whitespace-separated list, for example:
+
+```
+make check-world PG_TEST_EXTRA='kerberos ldap ssl'
+```
+
+The following values are currently supported:
+
+kerberos
+
+Runs the test suite under src/test/kerberos. This requires an MIT Kerberos installation and opens TCP/IP listen sockets.
+
+ldap
+
+Runs the test suite under src/test/ldap. This requires an OpenLDAP installation and opens TCP/IP listen sockets.
+
+ssl
+
+Runs the test suite under src/test/ssl. This opens TCP/IP listen sockets.
+
+```
+wal_consistency_checking
+```
+
+Uses wal\_consistency\_checking=all while running certain tests under src/test/ recovery. Not enabled by default because it is resource intensive.
+
+Tests for features that are not supported by the current build configuration are not run even if they are mentioned in PG\_TEST\_EXTRA.
+
+In addition, there are tests in src/test/modules which will be run by make check-world but not by make installcheck-world. This is because they install non-production extensions or have other side-effects that are considered undesirable for a production installation. You can use make install and make installcheck in one of those subdirectories if you wish, but it's not recommended to do so with a non-test server.

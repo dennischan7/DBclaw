@@ -1,0 +1,12 @@
+---
+source: MySQL 8.0 Reference
+title: 00_Overview
+---
+
+It is possible for the data on the source and replica to become different if a statement is written in such a way that the data modification is nondeterministic; that is, left up the query optimizer. (In general, this is not a good practice, even outside of replication.) Examples of nondeterministic statements include DELETE or UPDATE statements that use LIMIT with no ORDER BY clause; see [Section 19.5.1.18,](#page-61-1) ["Replication and LIMIT",](#page-61-1) for a detailed discussion of these.
+
+# <span id="page-63-0"></span>**19.5.1.24 Replication and Partitioning**
+
+Replication is supported between partitioned tables as long as they use the same partitioning scheme and otherwise have the same structure, except where an exception is specifically allowed (see [Section 19.5.1.9, "Replication with Differing Table Definitions on Source and Replica"\)](#page-52-0).
+
+Replication between tables that have different partitioning is generally not supported. This because statements (such as ALTER TABLE ... DROP PARTITION) that act directly on partitions in such cases might produce different results on the source and the replica. In the case where a table is partitioned on the source but not on the replica, any statements that operate on partitions on the source's copy of the replica fail on the replica. When the replica's copy of the table is partitioned but the source's copy is not, statements that act directly on partitions cannot be run on the source without causing errors there. To avoid stopping replication or creating inconsistencies between the source and replica, always ensure that a table on the source and the corresponding replicated table on the replica are partitioned in the same way.

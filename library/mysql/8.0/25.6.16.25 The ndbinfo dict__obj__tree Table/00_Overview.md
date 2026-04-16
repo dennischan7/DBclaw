@@ -1,0 +1,207 @@
+---
+source: MySQL 8.0 Reference
+title: 00_Overview
+---
+
+The dict\_obj\_tree table provides a tree-based view of table information from the [dict\\_obj\\_info](#page-154-0) table. This is intended primarily for use in testing, but can be useful in visualizing hierarchies of NDB database objects.
+
+The dict\_obj\_tree table contains the following columns:
+
+• type
+
+Type of [DICT](https://dev.mysql.com/doc/ndb-internals/en/ndb-internals-kernel-blocks-dbdict.md) object; join on [dict\\_obj\\_types](#page-157-0) to obtain the name of the object type
+
+• id
+
+Object identifier; same as the id column in [dict\\_obj\\_info](#page-154-0)
+
+For Disk Data undo log files and data files, this is the same as the value shown in the LOGFILE\_GROUP\_NUMBER column of the Information Schema FILES table; for undo log files, it also the same as the value shown for the log\_id column in the ndbinfo [logbuffers](#page-171-0) and [logspaces](#page-172-1) tables
+
+• name
+
+The fully qualified name of the object; the same as the fq\_name column in [dict\\_obj\\_info](#page-154-0)
+
+For a table, this is database\_name/def/table\_name (the same as its parent\_name); for an index of any type, this takes the form NDB\$INDEX\_index\_id\_CUSTOM
+
+• parent\_type
+
+The DICT object type of this object's parent object; join on [dict\\_obj\\_types](#page-157-0) to obtain the name of the object type
+
+• parent\_id
+
+Identifier for this object's parent object; the same as the [dict\\_obj\\_info](#page-154-0) table's id column
+
+• parent\_name
+
+Fully qualified name of this object's parent object; the same as the [dict\\_obj\\_info](#page-154-0) table's fq\_name column
+
+For a table, this has the form database\_name/def/table\_name. For an index, the name is sys/ def/table\_id/index\_name. For a primary key, it is sys/def/table\_id/PRIMARY, and for a unique key it is sys/def/table\_id/uk\_name\$unique
+
+• root\_type
+
+The DICT object type of the root object; join on [dict\\_obj\\_types](#page-157-0) to obtain the name of the object type
+
+• root\_id
+
+Identifier for the root object; the same as the [dict\\_obj\\_info](#page-154-0) table's id column
+
+• root\_name
+
+Fully qualified name of the root object; the same as the [dict\\_obj\\_info](#page-154-0) table's fq\_name column
+
+• level
+
+Level of the object in the hierarchy
+
+• path
+
+Complete path to the object in the NDB object hierarchy; objects are separated by a right arrow (represented as ->), starting with the root object on the left
+
+• indented\_name
+
+The name prefixed with a right arrow (represented as ->) with a number of spaces preceding it that correspond to the object's depth in the hierarchy
+
+The path column is useful for obtaining a complete path to a given NDB database object in a single line, whereas the indented\_name column can be used to obtain a tree-like layout of complete hierarchy information for a desired object.
+
+Example: Assuming the existence of a test database and no existing table named t1 in this database, execute the following SQL statement:
+
+```
+CREATE TABLE test.t1 (
+ a INT PRIMARY KEY,
+ b INT,
+ UNIQUE KEY(b)
+) ENGINE = NDB;
+```
+
+You can obtain the path to the table just created using the query shown here:
+
+```
+mysql> SELECT path FROM ndbinfo.dict_obj_tree
+ -> WHERE name LIKE 'test%t1';
++-------------+
+| path |
++-------------+
+| test/def/t1 |
++-------------+
+1 row in set (0.14 sec)
+```
+
+You can see the paths to all dependent objects of this table using the path to the table as the root name in a query like this one:
+
+```
+mysql> SELECT path FROM ndbinfo.dict_obj_tree
+ -> WHERE root_name = 'test/def/t1';
++----------------------------------------------------------+
+| path |
++----------------------------------------------------------+
+| test/def/t1 |
+| test/def/t1 -> sys/def/13/b |
+| test/def/t1 -> sys/def/13/b -> NDB$INDEX_15_CUSTOM |
+| test/def/t1 -> sys/def/13/b$unique |
+| test/def/t1 -> sys/def/13/b$unique -> NDB$INDEX_16_UI |
+| test/def/t1 -> sys/def/13/PRIMARY |
+| test/def/t1 -> sys/def/13/PRIMARY -> NDB$INDEX_14_CUSTOM |
++----------------------------------------------------------+
+7 rows in set (0.16 sec)
+```
+
+To obtain a hierarchical view of the t1 table with all its dependent objects, execute a query similar to this one which selects the indented name of each object having test/def/t1 as the name of its root object:
+
+```
+mysql> SELECT indented_name FROM ndbinfo.dict_obj_tree
+ -> WHERE root_name = 'test/def/t1';
++----------------------------+
+| indented_name |
++----------------------------+
+| test/def/t1 |
+| -> sys/def/13/b |
+| -> NDB$INDEX_15_CUSTOM |
+| -> sys/def/13/b$unique |
+| -> NDB$INDEX_16_UI |
+| -> sys/def/13/PRIMARY |
+| -> NDB$INDEX_14_CUSTOM |
++----------------------------+
+7 rows in set (0.15 sec)
+```
+
+When working with Disk Data tables, note that, in this context, a tablespace or log file group is considered a root object. This means that you must know the name of any tablespace or log file group associated with a given table, or obtain this information from SHOW CREATE TABLE and then querying INFORMATION\_SCHEMA.FILES, or similar means as shown here:
+
+```
+mysql> SHOW CREATE TABLE test.dt_1\G
+*************************** 1. row ***************************
+ Table: dt_1
+Create Table: CREATE TABLE `dt_1` (
+ `member_id` int unsigned NOT NULL AUTO_INCREMENT,
+ `last_name` varchar(50) NOT NULL,
+ `first_name` varchar(50) NOT NULL,
+```
+
+```
+ `dob` date NOT NULL,
+ `joined` date NOT NULL,
+ PRIMARY KEY (`member_id`),
+ KEY `last_name` (`last_name`,`first_name`)
+) /*!50100 TABLESPACE `ts_1` STORAGE DISK */ ENGINE=ndbcluster DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+1 row in set (0.00 sec)
+mysql> SELECT DISTINCT TABLESPACE_NAME, LOGFILE_GROUP_NAME
+ -> FROM INFORMATION_SCHEMA.FILES WHERE TABLESPACE_NAME='ts_1';
++-----------------+--------------------+
+| TABLESPACE_NAME | LOGFILE_GROUP_NAME |
++-----------------+--------------------+
+| ts_1 | lg_1 |
++-----------------+--------------------+
+1 row in set (0.00 sec)
+```
+
+Now you can obtain hierarchical information for the table, tablespace, and log file group like this:
+
+```
+mysql> SELECT indented_name FROM ndbinfo.dict_obj_tree
+ -> WHERE root_name = 'test/def/dt_1';
++----------------------------+
+| indented_name |
++----------------------------+
+| test/def/dt_1 |
+| -> sys/def/23/last_name |
+| -> NDB$INDEX_25_CUSTOM |
+| -> sys/def/23/PRIMARY |
+| -> NDB$INDEX_24_CUSTOM |
++----------------------------+
+5 rows in set (0.15 sec)
+mysql> SELECT indented_name FROM ndbinfo.dict_obj_tree
+ -> WHERE root_name = 'ts_1';
++-----------------+
+| indented_name |
++-----------------+
+| ts_1 |
+| -> data_1.dat |
+| -> data_2.dat |
++-----------------+
+3 rows in set (0.17 sec)
+mysql> SELECT indented_name FROM ndbinfo.dict_obj_tree
+ -> WHERE root_name LIKE 'lg_1';
++-----------------+
+| indented_name |
++-----------------+
+| lg_1 |
+| -> undo_1.log |
+| -> undo_2.log |
++-----------------+
+3 rows in set (0.16 sec)
+```
+
+The dict\_obj\_tree table was added in NDB 8.0.24.
+
+# <span id="page-157-0"></span>**25.6.16.26 The ndbinfo dict\_obj\_types Table**
+
+The dict\_obj\_types table is a static table listing possible dictionary object types used in the NDB kernel. These are the same types defined by [Object::Type](https://dev.mysql.com/doc/ndbapi/en/ndb-object.md#ndb-object-type) in the NDB API.
+
+The dict\_obj\_types table contains the following columns:
+
+• type\_id
+
+The type ID for this type
+
+• type\_name
+
+The name of this type

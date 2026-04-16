@@ -1,0 +1,2124 @@
+---
+source: MySQL 5.7 Reference
+title: 00_Overview
+---
+
+This section provides information about MySQL server options, server and status variables that are specific to NDB Cluster. For general information on using these, and for other options and variables not specific to NDB Cluster, see Section 5.1, "The MySQL Server".
+
+For NDB Cluster configuration parameters used in the cluster configuration file (usually named config.ini), see Section 21.4, "Configuration of NDB Cluster".
+
+### <span id="page-110-0"></span>**MySQL Server Options for NDB Cluster**
+
+This section provides descriptions of mysqld server options relating to NDB Cluster. For information about mysqld options not specific to NDB Cluster, and for general information about the use of options with mysqld, see Section 5.1.6, "Server Command Options".
+
+For information about command-line options used with other NDB Cluster processes, see [Section 21.5,](#page-171-1) ["NDB Cluster Programs"](#page-171-1).
+
+# <span id="page-110-1"></span>• [--ndbcluster](#page-110-1)
+
+| Command-Line Format | ndbcluster[=value] |
+|---------------------|--------------------|
+| Disabled by         | skip-ndbcluster    |
+| Type                | Boolean            |
+| Default Value       | OFF                |
+
+The NDBCLUSTER storage engine is necessary for using NDB Cluster. If a mysqld binary includes support for the NDBCLUSTER storage engine, the engine is disabled by default. Use the [-](#page-110-1) [ndbcluster](#page-110-1) option to enable it. Use --skip-ndbcluster to explicitly disable the engine.
+
+It is not necessary or desirable to use this option together with --initialize. Beginning with NDB 7.5.4, --ndbcluster is ignored (and the NDB storage engine is not enabled) if --initialize is also used. (Bug #81689, Bug #23518923)
+
+• --ndb-allow-copying-alter-table=[ON|OFF]
+
+| Command-Line Format | ndb-allow-copying-alter<br>table[={OFF ON}] |
+|---------------------|---------------------------------------------|
+| System Variable     | ndb_allow_copying_alter_table               |
+| Scope               | Global, Session                             |
+| Dynamic             | Yes                                         |
+| Type                | Boolean                                     |
+| Default Value       | ON                                          |
+
+Let ALTER TABLE and other DDL statements use copying operations on NDB tables. Set to OFF to keep this from happening; doing so may improve performance of critical applications.
+
+• --ndb-batch-size=#
+
+| Command-Line Format | ndb-batch-size  |
+|---------------------|-----------------|
+| System Variable     | ndb_batch_size  |
+| Scope               | Global, Session |
+| Dynamic             | Yes             |
+| Type                | Integer         |
+| Default Value       | 32768           |
+| Minimum Value       | 0               |
+| Maximum Value       | 2147483648      |
+| Maximum Value       | 2147483648      |
+| Maximum Value       | 31536000        |
+| Unit                | bytes           |
+
+This sets the size in bytes that is used for NDB transaction batches.
+
+<span id="page-111-0"></span>• --ndb-cluster-connection-pool=#
+
+| Command-Line Format | ndb-cluster-connection-pool |
+|---------------------|-----------------------------|
+| System Variable     | ndb_cluster_connection_pool |
+| System Variable     | ndb_cluster_connection_pool |
+| Scope               | Global                      |
+| Scope               | Global                      |
+| Dynamic             | No                          |
+| Dynamic             | No                          |
+| Type                | Integer                     |
+| Default Value       | 1                           |
+| Minimum Value       | 1                           |
+
+| Maximum Value | 63 |
+|---------------|----|
+|---------------|----|
+
+By setting this option to a value greater than 1 (the default), a mysqld process can use multiple connections to the cluster, effectively mimicking several SQL nodes. Each connection requires its own [api] or [mysqld] section in the cluster configuration (config.ini) file, and counts against the maximum number of API connections supported by the cluster.
+
+Suppose that you have 2 cluster host computers, each running an SQL node whose mysqld process was started with --ndb-cluster-connection-pool=4; this means that the cluster must have 8 API slots available for these connections (instead of 2). All of these connections are set up when the SQL node connects to the cluster, and are allocated to threads in a round-robin fashion.
+
+This option is useful only when running mysqld on host machines having multiple CPUs, multiple cores, or both. For best results, the value should be smaller than the total number of cores available on the host machine. Setting it to a value greater than this is likely to degrade performance severely.
+
+![](_page_112_Picture_5.jpeg)
+
+#### **Important**
+
+Because each SQL node using connection pooling occupies multiple API node slots—each slot having its own node ID in the cluster—you must not use a node ID as part of the cluster connection string when starting any mysqld process that employs connection pooling.
+
+Setting a node ID in the connection string when using the --ndb-clusterconnection-pool option causes node ID allocation errors when the SQL node attempts to connect to the cluster.
+
+• --ndb-cluster-connection-pool-nodeids=list
+
+| Command-Line Format | ndb-cluster-connection-pool<br>nodeids |
+|---------------------|----------------------------------------|
+| System Variable     | ndb_cluster_connection_pool_nodeids    |
+| Scope               | Global                                 |
+| Dynamic             | No                                     |
+| Type                | Set                                    |
+| Default Value       |                                        |
+
+Specifies a comma-separated list of node IDs for connections to the cluster used by an SQL node. The number of nodes in this list must be the same as the value set for the [--ndb-cluster](#page-111-0)[connection-pool](#page-111-0) option.
+
+--ndb-cluster-connection-pool-nodeids was added in NDB 7.5.0.
+
+• --ndb-blob-read-batch-bytes=bytes
+
+| Command-Line Format | ndb-blob-read-batch-bytes |
+|---------------------|---------------------------|
+| System Variable     | ndb_blob_read_batch_bytes |
+| Scope               | Global, Session           |
+| Dynamic             | Yes                       |
+| Type                | Integer                   |
+| Default Value       | 65536                     |
+| Minimum Value       | 0                         |
+
+| Maximum Value | 4294967295 |
+|---------------|------------|
+|---------------|------------|
+
+This option can be used to set the size (in bytes) for batching of BLOB data reads in NDB Cluster applications. When this batch size is exceeded by the amount of BLOB data to be read within the current transaction, any pending BLOB read operations are immediately executed.
+
+The maximum value for this option is 4294967295; the default is 65536. Setting it to 0 has the effect of disabling BLOB read batching.
+
+![](_page_113_Picture_4.jpeg)
+
+#### **Note**
+
+In NDB API applications, you can control BLOB write batching with the [setMaxPendingBlobReadBytes\(\)](https://dev.mysql.com/doc/ndbapi/en/ndb-ndbtransaction.md#ndb-ndbtransaction-setmaxpendingblobreadbytes) and [getMaxPendingBlobReadBytes\(\)](https://dev.mysql.com/doc/ndbapi/en/ndb-ndbtransaction.md#ndb-ndbtransaction-getmaxpendingblobreadbytes) methods.
+
+• --ndb-blob-write-batch-bytes=bytes
+
+| Command-Line Format | ndb-blob-write-batch-bytes |
+|---------------------|----------------------------|
+| System Variable     | ndb_blob_write_batch_bytes |
+| Scope               | Global, Session            |
+| Dynamic             | Yes                        |
+| Type                | Integer                    |
+| Default Value       | 65536                      |
+| Minimum Value       | 0                          |
+| Maximum Value       | 4294967295                 |
+| Unit                | bytes                      |
+
+This option can be used to set the size (in bytes) for batching of BLOB data writes in NDB Cluster applications. When this batch size is exceeded by the amount of BLOB data to be written within the current transaction, any pending BLOB write operations are immediately executed.
+
+The maximum value for this option is 4294967295; the default is 65536. Setting it to 0 has the effect of disabling BLOB write batching.
+
+![](_page_113_Picture_11.jpeg)
+
+#### **Note**
+
+In NDB API applications, you can control BLOB write batching with the [setMaxPendingBlobWriteBytes\(\)](https://dev.mysql.com/doc/ndbapi/en/ndb-ndbtransaction.md#ndb-ndbtransaction-setmaxpendingblobwritebytes) and [getMaxPendingBlobWriteBytes\(\)](https://dev.mysql.com/doc/ndbapi/en/ndb-ndbtransaction.md#ndb-ndbtransaction-getmaxpendingblobwritebytes) methods.
+
+<span id="page-113-0"></span>• --ndb-connectstring=connection\_string
+
+| Command-Line Format | ndb-connectstring |
+|---------------------|-------------------|
+| Type                | String            |
+
+When using the NDBCLUSTER storage engine, this option specifies the management server that distributes cluster configuration data. See Section 21.4.3.3, "NDB Cluster Connection Strings", for syntax.
+
+• --ndb-default-column-format=[FIXED|DYNAMIC]
+
+| Command-Line Format | ndb-default-column-format={FIXED <br>DYNAMIC} |
+|---------------------|-----------------------------------------------|
+| System Variable     | ndb_default_column_format                     |
+| Scope               | Global                                        |
+
+| Dynamic       | Yes         |
+|---------------|-------------|
+| Type          | Enumeration |
+| Default Value | FIXED       |
+| Valid Values  | FIXED       |
+|               | DYNAMIC     |
+
+In NDB 7.5.1 and later, sets the default COLUMN\_FORMAT and ROW\_FORMAT for new tables (see Section 13.1.18, "CREATE TABLE Statement").
+
+In NDB 7.5.1, the default for this option was DYNAMIC; in NDB 7.5.4, the default was changed to FIXED to maintain backwards compatibility with older release series (Bug #24487363).
+
+• --ndb-deferred-constraints=[0|1]
+
+| Command-Line Format | ndb-deferred-constraints |
+|---------------------|--------------------------|
+| System Variable     | ndb_deferred_constraints |
+| Scope               | Global, Session          |
+| Dynamic             | Yes                      |
+| Type                | Integer                  |
+| Default Value       | 0                        |
+| Minimum Value       | 0                        |
+| Maximum Value       | 1                        |
+
+Controls whether or not constraint checks on unique indexes are deferred until commit time, where such checks are supported. 0 is the default.
+
+This option is not normally needed for operation of NDB Cluster or NDB Cluster Replication, and is intended primarily for use in testing.
+
+• --ndb-distribution=[KEYHASH|LINHASH]
+
+| Command-Line Format | ndb-distribution={KEYHASH LINHASH} |
+|---------------------|------------------------------------|
+| System Variable     | ndb_distribution                   |
+| Scope               | Global                             |
+| Dynamic             | Yes                                |
+| Type                | Enumeration                        |
+| Default Value       | KEYHASH                            |
+| Valid Values        | LINHASH                            |
+|                     | KEYHASH                            |
+
+Controls the default distribution method for NDB tables. Can be set to either of KEYHASH (key hashing) or LINHASH (linear hashing). KEYHASH is the default.
+
+<span id="page-114-0"></span>• --ndb-log-apply-status
+
+| Command-Line Format | ndb-log-apply-status[={OFF ON}] |
+|---------------------|---------------------------------|
+| System Variable     | ndb_log_apply_status            |
+| Scope               | Global                          |
+| Dynamic             | No<br>3287                      |
+
+| Type          | Boolean |
+|---------------|---------|
+| Default Value | OFF     |
+
+Causes a replica mysqld to log any updates received from its immediate source to the mysql.ndb\_apply\_status table in its own binary log using its own server ID rather than the server ID of the source. In a circular or chain replication setting, this allows such updates to propagate to the mysql.ndb\_apply\_status tables of any MySQL servers configured as replicas of the current mysqld.
+
+In a chain replication setup, using this option allows downstream (replica) clusters to be aware of their positions relative to all of their upstream contributors (sources).
+
+In a circular replication setup, this option causes changes to ndb\_apply\_status tables to complete the entire circuit, eventually propagating back to the originating NDB Cluster. This also allows a cluster acting as a source to see when its changes (epochs) have been applied to the other clusters in the circle.
+
+This option has no effect unless the MySQL server is started with the [--ndbcluster](#page-110-1) option.
+
+• --ndb-log-empty-epochs=[ON|OFF]
+
+| Command-Line Format | ndb-log-empty-epochs[={OFF ON}] |
+|---------------------|---------------------------------|
+| System Variable     | ndb_log_empty_epochs            |
+| Scope               | Global                          |
+| Dynamic             | Yes                             |
+| Type                | Boolean                         |
+| Default Value       | OFF                             |
+
+Causes epochs during which there were no changes to be written to the ndb\_apply\_status and ndb\_binlog\_index tables, even when log\_slave\_updates is enabled.
+
+By default this option is disabled. Disabling --ndb-log-empty-epochs causes epoch transactions with no changes not to be written to the binary log, although a row is still written even for an empty epoch in ndb\_binlog\_index.
+
+Because --ndb-log-empty-epochs=1 causes the size of the ndb\_binlog\_index table to increase independently of the size of the binary log, users should be prepared to manage the growth of this table, even if they expect the cluster to be idle a large part of the time.
+
+• --ndb-log-empty-update=[ON|OFF]
+
+| Command-Line Format | ndb-log-empty-update[={OFF ON}] |
+|---------------------|---------------------------------|
+| System Variable     | ndb_log_empty_update            |
+| Scope               | Global                          |
+| Dynamic             | Yes                             |
+| Type                | Boolean                         |
+| Default Value       | OFF                             |
+
+Causes updates that produced no changes to be written to the ndb\_apply\_status and ndb\_binlog\_index tables, when when log\_slave\_updates is enabled.
+
+By default this option is disabled (OFF). Disabling --ndb-log-empty-update causes updates with no changes not to be written to the binary log.
+
+• --ndb-log-exclusive-reads=[0|1]
+
+| Command-Line Format | ndb-log-exclusive-reads[={OFF ON}] |
+|---------------------|------------------------------------|
+| System Variable     | ndb_log_exclusive_reads            |
+| Scope               | Global, Session                    |
+| Dynamic             | Yes                                |
+| Type                | Boolean                            |
+| Default Value       | 0                                  |
+
+Starting the server with this option causes primary key reads to be logged with exclusive locks, which allows for NDB Cluster Replication conflict detection and resolution based on read conflicts. You can also enable and disable these locks at runtime by setting the value of the [ndb\\_log\\_exclusive\\_reads](#page-130-2) system variable to 1 or 0, respectively. 0 (disable locking) is the default.
+
+For more information, see Read conflict detection and resolution.
+
+• --ndb-log-fail-terminate
+
+| Command-Line Format | ndb-log-fail-terminate |
+|---------------------|------------------------|
+| System Variable     | ndb_log_fail_terminate |
+| Scope               | Global                 |
+| Dynamic             | No                     |
+| Type                | Boolean                |
+| Default Value       | FALSE                  |
+
+When this option is specified, and complete logging of all found row events is not possible, the mysqld process is terminated.
+
+<span id="page-116-0"></span>• --ndb-log-orig
+
+| Command-Line Format | ndb-log-orig[={OFF ON}] |
+|---------------------|-------------------------|
+| System Variable     | ndb_log_orig            |
+| Scope               | Global                  |
+| Dynamic             | No                      |
+| Type                | Boolean                 |
+| Default Value       | OFF                     |
+
+Log the originating server ID and epoch in the ndb\_binlog\_index table.
+
+![](_page_116_Picture_11.jpeg)
+
+#### **Note**
+
+This makes it possible for a given epoch to have multiple rows in ndb\_binlog\_index, one for each originating epoch.
+
+For more information, see Section 21.7.4, "NDB Cluster Replication Schema and Tables".
+
+<span id="page-116-1"></span>• --ndb-log-transaction-id
+
+| Command-Line Format | ndb-log-transaction-id[={OFF ON}] |
+|---------------------|-----------------------------------|
+| System Variable     | ndb_log_transaction_id<br>3289    |
+| Scope               | Global                            |
+
+| Dynamic       | No      |
+|---------------|---------|
+| Type          | Boolean |
+| Default Value | OFF     |
+
+Causes a replica mysqld to write the NDB transaction ID in each row of the binary log. Such logging requires the use of the Version 2 event format for the binary log; thus, the log\_bin\_use\_v1\_row\_events system variable must be disabled to use this option.
+
+--ndb-log-transaction-id is required to enable NDB Cluster Replication conflict detection and resolution using the NDB\$EPOCH\_TRANS() function (see NDB\$EPOCH\_TRANS()).
+
+For more information, see Section 21.7.11, "NDB Cluster Replication Conflict Resolution".
+
+<span id="page-117-1"></span>• --ndb-log-update-as-write
+
+| Command-Line Format | ndb-log-update-as-write[={OFF ON}] |
+|---------------------|------------------------------------|
+| System Variable     | ndb_log_update_as_write            |
+| Scope               | Global                             |
+| Dynamic             | Yes                                |
+| Type                | Boolean                            |
+| Default Value       | ON                                 |
+
+Whether updates on the source are written to the binary log as updates (OFF) or writes (ON). When this option is enabled, and both [--ndb-log-updated-only](#page-117-0) and [--ndb-log-update-minimal](#page-118-0) are disabled, operations of different types are loǵged as described in the following list:
+
+• INSERT: Logged as a WRITE\_ROW event with no before image; the after image is logged with all columns.
+
+UPDATE: Logged as a WRITE\_ROW event with no before image; the after image is logged with all columns.
+
+DELETE: Logged as a DELETE\_ROW event with all columns logged in the before image; the after image is not logged.
+
+This option can be used for NDB Replication conflict resolution in combination with the other two NDB logging options mentioned previously; see ndb\_replication Table, for more information.
+
+<span id="page-117-0"></span>• --ndb-log-updated-only
+
+| Command-Line Format | ndb-log-updated-only[={OFF ON}] |
+|---------------------|---------------------------------|
+| System Variable     | ndb_log_updated_only            |
+| Scope               | Global                          |
+| Dynamic             | Yes                             |
+| Type                | Boolean                         |
+| Default Value       | ON                              |
+
+Whether mysqld writes updates only (ON) or complete rows (OFF) to the binary log. When this option is enabled, and both [--ndb-log-update-as-write](#page-117-1) and [--ndb-log-update-minimal](#page-118-0) are disabled, operations of different types are loǵged as described in the following list
+
+• INSERT: Logged as a WRITE\_ROW event with no before image; the after image is logged with all columns.
+
+- UPDATE: Logged as an UPDATE\_ROW event with primary key columns and updated columns present in both the before and after images.
+- DELETE: Logged as a DELETE\_ROW event with primary key columns incuded in the before image; the after image is not logged.
+
+This option can be used for NDB Replication conflict resolution in combination with the other two NDB logging options mentioned previously; see ndb\_replication Table, for more information about how these options interact with one another.
+
+<span id="page-118-0"></span>• --ndb-log-update-minimal
+
+| Command-Line Format | ndb-log-update-minimal[={OFF ON}] |
+|---------------------|-----------------------------------|
+| System Variable     | ndb_log_update_minimal            |
+| Scope               | Global                            |
+| Dynamic             | Yes                               |
+| Type                | Boolean                           |
+| Default Value       | OFF                               |
+
+Log updates in a minimal fashion, by writing only the primary key values in the before image, and only the changed columns in the after image. This may cause compatibility problems if replicating to storage engines other than NDB. When this option is enabled, and both [--ndb-log-updated](#page-117-0)[only](#page-117-0) and [--ndb-log-update-as-write](#page-117-1) are disabled, operations of different types are loǵged as described in the following list:
+
+- INSERT: Logged as a WRITE\_ROW event with no before image; the after image is logged with all columns.
+- UPDATE: Logged as an UPDATE\_ROW event with primary key columns in the before image; all columns except primary key columns are logged in the after image.
+- DELETE: Logged as a DELETE\_ROW event with all columns in the before image; the after image is not logged.
+
+This option can be used for NDB Replication conflict resolution in combination with the other two NDB logging options mentioned previously; see ndb\_replication Table, for more information.
+
+• --ndb-mgmd-host=host[:port]
+
+| Command-Line Format | ndb-mgmd-host=host_name[:port_num] |
+|---------------------|------------------------------------|
+| Type                | String                             |
+| Default Value       | localhost:1186                     |
+
+Can be used to set the host and port number of a single management server for the program to connect to. If the program requires node IDs or references to multiple management servers (or both) in its connection information, use the [--ndb-connectstring](#page-113-0) option instead.
+
+• --ndb-nodeid=#
+
+| Command-Line Format | ndb-nodeid=#        |
+|---------------------|---------------------|
+| Status Variable     | Ndb_cluster_node_id |
+| Scope               | Global              |
+| Dynamic             | No                  |
+| Type                | Integer             |
+
+| Default Value | N/A |
+|---------------|-----|
+| Minimum Value | 1   |
+| Maximum Value | 255 |
+| Maximum Value | 63  |
+
+Set this MySQL server's node ID in an NDB Cluster.
+
+The --ndb-nodeid option overrides any node ID set with [--ndb-connectstring](#page-113-0), regardless of the order in which the two options are used.
+
+In addition, if --ndb-nodeid is used, then either a matching node ID must be found in a [mysqld] or [api] section of config.ini, or there must be an "open" [mysqld] or [api] section in the file (that is, a section without a NodeId or Id parameter specified). This is also true if the node ID is specified as part of the connection string.
+
+Regardless of how the node ID is determined, its is shown as the value of the global status variable Ndb\_cluster\_node\_id in the output of SHOW STATUS, and as cluster\_node\_id in the connection row of the output of SHOW ENGINE NDBCLUSTER STATUS.
+
+For more information about node IDs for NDB Cluster SQL nodes, see [Section 21.4.3.7, "Defining](#page-98-1) [SQL and Other API Nodes in an NDB Cluster".](#page-98-1)
+
+• --ndb-optimization-delay=milliseconds
+
+| Command-Line Format | ndb-optimization-delay=# |
+|---------------------|--------------------------|
+| System Variable     | ndb_optimization_delay   |
+| Scope               | Global                   |
+| Dynamic             | Yes                      |
+| Type                | Integer                  |
+| Default Value       | 10                       |
+| Minimum Value       | 0                        |
+| Maximum Value       | 100000                   |
+| Unit                | milliseconds             |
+
+Set the number of milliseconds to wait between sets of rows by OPTIMIZE TABLE statements on NDB tables. The default is 10.
+
+• --ndb-optimized-node-selection
+
+| Command-Line Format | ndb-optimized-node-selection |
+|---------------------|------------------------------|
+| System Variable     | ndb_optimized_node_selection |
+| Scope               | Global                       |
+| Dynamic             | Yes                          |
+| Type                | Integer                      |
+| Default Value       | 3                            |
+| Minimum Value       | 0                            |
+| Maximum Value       | 3                            |
+
+Enable optimizations for selection of nodes for transactions. Enabled by default; use --skip-ndboptimized-node-selection to disable.
+
+• --ndb-transid-mysql-connection-map=state
+
+| Command-Line Format | ndb-transid-mysql-connection<br>map[=state] |
+|---------------------|---------------------------------------------|
+| Type                | Enumeration                                 |
+| Default Value       | ON                                          |
+| Valid Values        | ON                                          |
+|                     | OFF                                         |
+|                     | FORCE                                       |
+
+Enables or disables the plugin that handles the ndb\_transid\_mysql\_connection\_map table in the INFORMATION\_SCHEMA database. Takes one of the values ON, OFF, or FORCE. ON (the default) enables the plugin. OFF disables the plugin, which makes ndb\_transid\_mysql\_connection\_map inaccessible. FORCE keeps the MySQL Server from starting if the plugin fails to load and start.
+
+You can see whether the ndb\_transid\_mysql\_connection\_map table plugin is running by checking the output of SHOW PLUGINS.
+
+• --ndb-wait-connected=seconds
+
+| Command-Line Format | ndb-wait-connected=# |
+|---------------------|----------------------|
+| System Variable     | ndb_wait_connected   |
+| Scope               | Global               |
+| Dynamic             | No                   |
+| Type                | Integer              |
+| Default Value       | 30                   |
+| Minimum Value       | 0                    |
+| Maximum Value       | 31536000             |
+| Unit                | seconds              |
+
+This option sets the period of time that the MySQL server waits for connections to NDB Cluster management and data nodes to be established before accepting MySQL client connections. The time is specified in seconds. The default value is 30.
+
+• --ndb-wait-setup=seconds
+
+| Command-Line Format | ndb-wait-setup=# |
+|---------------------|------------------|
+| System Variable     | ndb_wait_setup   |
+| Scope               | Global           |
+| Dynamic             | No               |
+| Type                | Integer          |
+| Default Value       | 30               |
+| Default Value       | 30               |
+| Default Value       | 15               |
+| Default Value       | 15               |
+| Minimum Value       | 0                |
+| Maximum Value       | 31536000         |
+
+| Unit | seconds |
+|------|---------|
+|------|---------|
+
+This variable shows the period of time that the MySQL server waits for the NDB storage engine to complete setup before timing out and treating NDB as unavailable. The time is specified in seconds. The default value is 30.
+
+• --skip-ndbcluster
+
+| Command-Line Format | skip-ndbcluster |
+|---------------------|-----------------|
+|---------------------|-----------------|
+
+Disable the NDBCLUSTER storage engine. This is the default for binaries that were built with NDBCLUSTER storage engine support; the server allocates memory and other resources for this storage engine only if the [--ndbcluster](#page-110-1) option is given explicitly. See Section 21.4.1, "Quick Test Setup of NDB Cluster", for an example.
+
+### <span id="page-121-0"></span>**NDB Cluster System Variables**
+
+This section provides detailed information about MySQL server system variables that are specific to NDB Cluster and the NDB storage engine. For system variables not specific to NDB Cluster, see Section 5.1.7, "Server System Variables". For general information on using system variables, see Section 5.1.8, "Using System Variables".
+
+<span id="page-121-1"></span>• [ndb\\_autoincrement\\_prefetch\\_sz](#page-121-1)
+
+| Command-Line Format | ndb-autoincrement-prefetch-sz=# |
+|---------------------|---------------------------------|
+| System Variable     | ndb_autoincrement_prefetch_sz   |
+| Scope               | Global, Session                 |
+| Dynamic             | Yes                             |
+| Type                | Integer                         |
+| Default Value       | 1                               |
+| Minimum Value       | 1                               |
+| Maximum Value       | 65536                           |
+
+Determines the probability of gaps in an autoincremented column. Set it to 1 to minimize this. Setting it to a high value for optimization makes inserts faster, but decreases the likelihood that consecutive autoincrement numbers are used in a batch of inserts.
+
+This variable affects only the number of AUTO\_INCREMENT IDs that are fetched between statements; within a given statement, at least 32 IDs are obtained at a time.
+
+![](_page_121_Picture_12.jpeg)
+
+#### **Important**
+
+This variable does not affect inserts performed using INSERT ... SELECT.
+
+• [ndb\\_cache\\_check\\_time](#page-121-2)
+
+<span id="page-121-2"></span>
+
+|      | Command-Line Format | ndb-cache-check-time=# |
+|------|---------------------|------------------------|
+|      | Deprecated          | Yes                    |
+|      | System Variable     | ndb_cache_check_time   |
+|      | Scope               | Global                 |
+|      | Dynamic             | Yes                    |
+|      | Type                | Integer                |
+| 3294 | Default Value       | 0                      |
+
+| Minimum Value | 0            |
+|---------------|--------------|
+| Maximum Value | 31536000     |
+| Unit          | milliseconds |
+
+The number of milliseconds that elapse between checks of NDB Cluster SQL nodes by the MySQL query cache. Setting this to 0 (the default and minimum value) means that the query cache checks for validation on every query.
+
+The recommended maximum value for this variable is 1000, which means that the check is performed once per second. A larger value means that the check is performed and possibly invalidated due to updates on different SQL nodes less often. It is generally not desirable to set this to a value greater than 2000.
+
+![](_page_122_Picture_4.jpeg)
+
+#### **Note**
+
+The query cache is deprecated as of MySQL 5.7.20, and is removed in MySQL 8.0. Deprecation includes [ndb\\_cache\\_check\\_time](#page-121-2).
+
+<span id="page-122-0"></span>• [ndb\\_clear\\_apply\\_status](#page-122-0)
+
+| Command-Line Format | ndb-clear-apply-status[={OFF ON}] |
+|---------------------|-----------------------------------|
+| System Variable     | ndb_clear_apply_status            |
+| Scope               | Global                            |
+| Dynamic             | Yes                               |
+| Type                | Boolean                           |
+| Default Value       | ON                                |
+
+By the default, executing RESET SLAVE causes an NDB Cluster replica to purge all rows from its ndb\_apply\_status table. You can disable this by setting ndb\_clear\_apply\_status=OFF.
+
+<span id="page-122-1"></span>• [ndb\\_data\\_node\\_neighbour](#page-122-1)
+
+| Command-Line Format | ndb-data-node-neighbour=# |
+|---------------------|---------------------------|
+| System Variable     | ndb_data_node_neighbour   |
+| Scope               | Global                    |
+| Dynamic             | Yes                       |
+| Type                | Integer                   |
+| Default Value       | 0                         |
+| Minimum Value       | 0                         |
+| Maximum Value       | 255                       |
+
+Sets the ID of a "nearest" data node—that is, a preferred nonlocal data node is chosen to execute the transaction, rather than one running on the same host as the SQL or API node. This used to ensure that when a fully replicated table is accessed, we access it on this data node, to ensure that the local copy of the table is always used whenever possible. This can also be used for providing hints for transactions.
+
+This can improve data access times in the case of a node that is physically closer than and thus has higher network throughput than others on the same host.
+
+See Section 13.1.18.9, "Setting NDB Comment Options", for further information.
+
+Added in NDB 7.5.2.
+
+![](_page_123_Picture_5.jpeg)
+
+#### **Note**
+
+An equivalent method [set\\_data\\_node\\_neighbour\(\)](https://dev.mysql.com/doc/ndbapi/en/ndb-ndb-cluster-connection.md#ndb-ndb-cluster-connection-set-data-node-neighbour) is provided for use in NDB API applications.
+
+<span id="page-123-0"></span>• [ndb\\_default\\_column\\_format](#page-123-0)
+
+| Command-Line Format | ndb-default-column-format={FIXED <br>DYNAMIC} |
+|---------------------|-----------------------------------------------|
+| System Variable     | ndb_default_column_format                     |
+| Scope               | Global                                        |
+| Dynamic             | Yes                                           |
+| Type                | Enumeration                                   |
+| Default Value       | FIXED                                         |
+| Valid Values        | FIXED                                         |
+|                     | DYNAMIC                                       |
+
+In NDB 7.5.1 and later, sets the default COLUMN\_FORMAT and ROW\_FORMAT for new tables (see Section 13.1.18, "CREATE TABLE Statement").
+
+In NDB 7.5.1, the default for this variable was DYNAMIC; in NDB 7.5.4, the default was changed to FIXED to maintain backwards compatibility with older release series (Bug #24487363).
+
+<span id="page-123-1"></span>• [ndb\\_deferred\\_constraints](#page-123-1)
+
+| Command-Line Format | ndb-deferred-constraints=# |
+|---------------------|----------------------------|
+| System Variable     | ndb_deferred_constraints   |
+| Scope               | Global, Session            |
+| Dynamic             | Yes                        |
+| Type                | Integer                    |
+| Default Value       | 0                          |
+| Minimum Value       | 0                          |
+| Maximum Value       | 1                          |
+
+Controls whether or not constraint checks are deferred, where these are supported. 0 is the default.
+
+This variable is not normally needed for operation of NDB Cluster or NDB Cluster Replication, and is intended primarily for use in testing.
+
+• [ndb\\_distribution](#page-123-2)
+
+<span id="page-123-2"></span>
+
+|      | Command-Line Format | ndb-distribution={KEYHASH LINHASH} |
+|------|---------------------|------------------------------------|
+| 3296 | System Variable     | ndb_distribution                   |
+
+| Scope         | Global      |
+|---------------|-------------|
+| Dynamic       | Yes         |
+| Type          | Enumeration |
+| Default Value | KEYHASH     |
+| Valid Values  | LINHASH     |
+|               | KEYHASH     |
+
+Controls the default distribution method for NDB tables. Can be set to either of KEYHASH (key hashing) or LINHASH (linear hashing). KEYHASH is the default.
+
+<span id="page-124-0"></span>• [ndb\\_eventbuffer\\_free\\_percent](#page-124-0)
+
+| Command-Line Format | ndb-eventbuffer-free-percent=# |
+|---------------------|--------------------------------|
+| System Variable     | ndb_eventbuffer_free_percent   |
+| Scope               | Global                         |
+| Dynamic             | Yes                            |
+| Type                | Integer                        |
+| Default Value       | 20                             |
+| Minimum Value       | 1                              |
+| Maximum Value       | 99                             |
+
+Sets the percentage of the maximum memory allocated to the event buffer (ndb\_eventbuffer\_max\_alloc) that should be available in event buffer after reaching the maximum, before starting to buffer again.
+
+<span id="page-124-1"></span>• [ndb\\_eventbuffer\\_max\\_alloc](#page-124-1)
+
+| Command-Line Format | ndb-eventbuffer-max-alloc=# |
+|---------------------|-----------------------------|
+| System Variable     | ndb_eventbuffer_max_alloc   |
+| Scope               | Global                      |
+| Dynamic             | Yes                         |
+| Type                | Integer                     |
+| Default Value       | 0                           |
+| Minimum Value       | 0                           |
+| Maximum Value       | 9223372036854775807         |
+| Maximum Value       | 9223372036854775807         |
+| Maximum Value       | 4294967295                  |
+
+Sets the maximum amount memory (in bytes) that can be allocated for buffering events by the NDB API. 0 means that no limit is imposed, and is the default.
+
+<span id="page-124-2"></span>• [ndb\\_extra\\_logging](#page-124-2)
+
+| Command-Line Format | ndb_extra_logging=# |
+|---------------------|---------------------|
+| System Variable     | ndb_extra_logging   |
+| Scope               | Global              |
+| Dynamic             | Yes                 |
+| Type                | Integer<br>3297     |
+
+| Default Value | 1 |
+|---------------|---|
+| Minimum Value | 0 |
+| Maximum Value | 1 |
+
+This variable enables recording in the MySQL error log of information specific to the NDB storage engine.
+
+When this variable is set to 0, the only information specific to NDB that is written to the MySQL error log relates to transaction handling. If it set to a value greater than 0 but less than 10, NDB table schema and connection events are also logged, as well as whether or not conflict resolution is in use, and other NDB errors and information. If the value is set to 10 or more, information about NDB internals, such as the progress of data distribution among cluster nodes, is also written to the MySQL error log. The default is 1.
+
+### <span id="page-125-0"></span>• [ndb\\_force\\_send](#page-125-0)
+
+| Command-Line Format | ndb-force-send[={OFF ON}] |
+|---------------------|---------------------------|
+| System Variable     | ndb_force_send            |
+| Scope               | Global, Session           |
+| Dynamic             | Yes                       |
+| Type                | Boolean                   |
+| Default Value       | ON                        |
+
+Forces sending of buffers to NDB immediately, without waiting for other threads. Defaults to ON.
+
+### <span id="page-125-1"></span>• [ndb\\_fully\\_replicated](#page-125-1)
+
+| Command-Line Format | ndb-fully-replicated[={OFF ON}] |
+|---------------------|---------------------------------|
+| System Variable     | ndb_fully_replicated            |
+| Scope               | Global, Session                 |
+| Dynamic             | Yes                             |
+| Type                | Boolean                         |
+| Default Value       | OFF                             |
+
+Determines whether new NDB tables are fully replicated. This setting can be overridden for an individual table using COMMENT="NDB\_TABLE=FULLY\_REPLICATED=..." in a CREATE TABLE or ALTER TABLE statement; see Section 13.1.18.9, "Setting NDB Comment Options", for syntax and other information.
+
+# Added in NDB 7.5.2.
+
+### <span id="page-125-2"></span>• [ndb\\_index\\_stat\\_enable](#page-125-2)
+
+| Command-Line Format | ndb-index-stat-enable[={OFF ON}] |  |
+|---------------------|----------------------------------|--|
+| System Variable     | ndb_index_stat_enable            |  |
+| Scope               | Global, Session                  |  |
+| Dynamic             | Yes                              |  |
+| Type                | Boolean                          |  |
+| Default Value       | ON                               |  |
+
+Use NDB index statistics in query optimization. The default is ON.
+
+<span id="page-125-3"></span>• [ndb\\_index\\_stat\\_option](#page-125-3)
+
+| Command-Line Format | ndb-index-stat-option=value                                                                                                                                                                                                                                         |  |
+|---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--|
+| System Variable     | ndb_index_stat_option                                                                                                                                                                                                                                               |  |
+| Scope               | Global, Session                                                                                                                                                                                                                                                     |  |
+| Dynamic             | Yes                                                                                                                                                                                                                                                                 |  |
+| Type                | String                                                                                                                                                                                                                                                              |  |
+| Default Value       | loop_checkon=1000ms,loop_idle=1000ms,loop_busy=100ms,<br>update_batch=1,read_batch=4,idle_batch=32,check_batch=32,<br>check_delay=1m,delete_batch=8,clean_delay=0,error_batch=4,<br>error_delay=1m,evict_batch=8,evict_delay=1m,cache_limit=32M,<br>cache_lowpct=90 |  |
+
+This variable is used for providing tuning options for NDB index statistics generation. The list consist of comma-separated name-value pairs of option names and values, and this list must not contain any space characters.
+
+```
+Options not used when setting ndb_index_stat_option are not changed from
+their default values. For example, you can set ndb_index_stat_option =
+'loop_idle=1000ms,cache_limit=32M'.
+```
+
+Time values can be optionally suffixed with h (hours), m (minutes), or s (seconds). Millisecond values can optionally be specified using ms; millisecond values cannot be specified using h, m, or s.) Integer values can be suffixed with K, M, or G.
+
+The names of the options that can be set using this variable are shown in the table that follows. The table also provides brief descriptions of the options, their default values, and (where applicable) their minimum and maximum values.
+
+**Table 21.18 ndb\_index\_stat\_option options and values**
+
+| Name         | Description                                             | Default/Units | Minimum/Maximum |
+|--------------|---------------------------------------------------------|---------------|-----------------|
+| loop_enable  |                                                         | 1000 ms       | 0/4G            |
+| loop_idle    | Time to sleep when idle                                 | 1000 ms       | 0/4G            |
+| loop_busy    | Time to sleep when<br>more work is waiting              | 100 ms        | 0/4G            |
+| update_batch |                                                         | 1             | 0/4G            |
+| read_batch   |                                                         | 4             | 1/4G            |
+| idle_batch   |                                                         | 32            | 1/4G            |
+| check_batch  |                                                         | 8             | 1/4G            |
+| check_delay  | How often to check for<br>new statistics                | 10 m          | 1/4G            |
+| delete_batch |                                                         | 8             | 0/4G            |
+| clean_delay  |                                                         | 1 m           | 0/4G            |
+| error_batch  |                                                         | 4             | 1/4G            |
+| error_delay  |                                                         | 1 m           | 1/4G            |
+| evict_batch  |                                                         | 8             | 1/4G            |
+| evict_delay  | Clean LRU cache, from<br>read time                      | 1 m           | 0/4G            |
+| cache_limit  | Maximum amount<br>of memory in bytes<br>used for cached | 32 M          | 0/4G            |
+
+| Name         | Description                                                                                                                                                 | Default/Units | Minimum/Maximum |
+|--------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-----------------|
+|              | index statistics by this<br>mysqld; clean up the<br>cache when this is<br>exceeded.                                                                         |               |                 |
+| cache_lowpct |                                                                                                                                                             | 90            | 0/100           |
+| zero_total   | Setting this to 1 resets<br>all accumulating<br>counters in<br>ndb_index_stat_status<br>to 0. This option value<br>is also reset to 0 when<br>this is done. | 0             | 0/1             |
+
+### <span id="page-127-0"></span>• [ndb\\_join\\_pushdown](#page-127-0)
+
+| System Variable | ndb_join_pushdown |
+|-----------------|-------------------|
+| Scope           | Global, Session   |
+| Dynamic         | Yes               |
+| Type            | Boolean           |
+| Default Value   | ON                |
+
+This variable controls whether joins on NDB tables are pushed down to the NDB kernel (data nodes). Previously, a join was handled using multiple accesses of NDB by the SQL node; however, when [ndb\\_join\\_pushdown](#page-127-0) is enabled, a pushable join is sent in its entirety to the data nodes, where it can be distributed among the data nodes and executed in parallel on multiple copies of the data, with a single, merged result being returned to mysqld. This can reduce greatly the number of round trips between an SQL node and the data nodes required to handle such a join.
+
+By default, [ndb\\_join\\_pushdown](#page-127-0) is enabled.
+
+**Conditions for NDB pushdown joins.** In order for a join to be pushable, it must meet the following conditions:
+
+1. Only columns can be compared, and all columns to be joined must use exactly the same data type.
+
+This means that expressions such as t1.a = t2.a + constant cannot be pushed down, and that (for example) a join on an INT column and a BIGINT column also cannot be pushed down.
+
+- 2. Queries referencing BLOB or TEXT columns are not supported.
+- 3. Explicit locking is not supported; however, the NDB storage engine's characteristic implicit rowbased locking is enforced.
+
+This means that a join using FOR UPDATE cannot be pushed down.
+
+4. In order for a join to be pushed down, child tables in the join must be accessed using one of the ref, eq\_ref, or const access methods, or some combination of these methods.
+
+Outer joined child tables can only be pushed using eq\_ref.
+
+If the root of the pushed join is an eq\_ref or const, only child tables joined by eq\_ref can be appended. (A table joined by ref is likely to become the root of another pushed join.)
+
+If the query optimizer decides on Using join cache for a candidate child table, that table cannot be pushed as a child. However, it may be the root of another set of pushed tables.
+
+5. Joins referencing tables explicitly partitioned by [LINEAR] HASH, LIST, or RANGE currently cannot be pushed down.
+
+You can see whether a given join can be pushed down by checking it with EXPLAIN; when the join can be pushed down, you can see references to the pushed join in the Extra column of the output, as shown in this example:
+
+```
+mysql> EXPLAIN
+ -> SELECT e.first_name, e.last_name, t.title, d.dept_name
+ -> FROM employees e
+ -> JOIN dept_emp de ON e.emp_no=de.emp_no
+ -> JOIN departments d ON d.dept_no=de.dept_no
+ -> JOIN titles t ON e.emp_no=t.emp_no\G
+*************************** 1. row ***************************
+ id: 1
+ select_type: SIMPLE
+ table: d
+ type: ALL
+possible_keys: PRIMARY
+ key: NULL
+ key_len: NULL
+ ref: NULL
+ rows: 9
+ Extra: Parent of 4 pushed join@1
+*************************** 2. row ***************************
+ id: 1
+ select_type: SIMPLE
+ table: de
+ type: ref
+possible_keys: PRIMARY,emp_no,dept_no
+ key: dept_no
+ key_len: 4
+ ref: employees.d.dept_no
+```
+
+```
+ rows: 5305
+ Extra: Child of 'd' in pushed join@1
+*************************** 3. row ***************************
+ id: 1
+ select_type: SIMPLE
+ table: e
+ type: eq_ref
+possible_keys: PRIMARY
+ key: PRIMARY
+ key_len: 4
+ ref: employees.de.emp_no
+ rows: 1
+ Extra: Child of 'de' in pushed join@1
+*************************** 4. row ***************************
+ id: 1
+ select_type: SIMPLE
+ table: t
+ type: ref
+possible_keys: PRIMARY,emp_no
+ key: emp_no
+ key_len: 4
+ ref: employees.de.emp_no
+ rows: 19
+ Extra: Child of 'e' in pushed join@1
+4 rows in set (0.00 sec)
+```
+
+![](_page_129_Picture_2.jpeg)
+
+#### **Note**
+
+If inner joined child tables are joined by ref, and the result is ordered or grouped by a sorted index, this index cannot provide sorted rows, which forces writing to a sorted tempfile.
+
+Two additional sources of information about pushed join performance are available:
+
+- 1. The status variables [Ndb\\_pushed\\_queries\\_defined](#page-154-0), [Ndb\\_pushed\\_queries\\_dropped](#page-154-1), [Ndb\\_pushed\\_queries\\_executed](#page-154-2), and [Ndb\\_pushed\\_reads](#page-154-3).
+- 2. The counters in the ndbinfo.counters table that belong to the [DBSPJ](https://dev.mysql.com/doc/ndb-internals/en/ndb-internals-kernel-blocks-dbspj.md) kernel block.
+- <span id="page-129-0"></span>• [ndb\\_log\\_apply\\_status](#page-129-0)
+
+| Command-Line Format | ndb-log-apply-status[={OFF ON}] |
+|---------------------|---------------------------------|
+| System Variable     | ndb_log_apply_status            |
+| Scope               | Global                          |
+| Dynamic             | No                              |
+| Type                | Boolean                         |
+| Default Value       | OFF                             |
+
+A read-only variable which shows whether the server was started with the [--ndb-log-apply](#page-114-0)[status](#page-114-0) option.
+
+<span id="page-129-1"></span>• [ndb\\_log\\_bin](#page-129-1)
+
+| Command-Line Format | ndb-log-bin[={OFF ON}] |
+|---------------------|------------------------|
+| System Variable     | ndb_log_bin            |
+| Scope               | Global, Session        |
+| Dynamic             | No                     |
+| Type                | Boolean                |
+
+| Default Value | ON |
+|---------------|----|
+|---------------|----|
+
+Causes updates to NDB tables to be written to the binary log. Setting this variable has no effect if binary logging is not already enabled for the server using log\_bin. ndb\_log\_bin defaults to 1 (ON); normally, there is never any need to change this value in a production environment.
+
+<span id="page-130-3"></span>• [ndb\\_log\\_binlog\\_index](#page-130-3)
+
+| Command-Line Format | ndb-log-binlog-index[={OFF ON}] |
+|---------------------|---------------------------------|
+| System Variable     | ndb_log_binlog_index            |
+| Scope               | Global                          |
+| Dynamic             | Yes                             |
+| Type                | Boolean                         |
+| Default Value       | ON                              |
+
+Causes a mapping of epochs to positions in the binary log to be inserted into the ndb\_binlog\_index table. Setting this variable has no effect if binary logging is not already enabled for the server using log\_bin. (In addition, [ndb\\_log\\_bin](#page-129-1) must not be disabled.) ndb\_log\_binlog\_index defaults to 1 (ON); normally, there is never any need to change this value in a production environment.
+
+<span id="page-130-0"></span>• [ndb\\_log\\_empty\\_epochs](#page-130-0)
+
+| Command-Line Format | ndb-log-empty-epochs[={OFF ON}] |  |
+|---------------------|---------------------------------|--|
+| System Variable     | ndb_log_empty_epochs            |  |
+| Scope               | Global                          |  |
+| Dynamic             | Yes                             |  |
+| Type                | Boolean                         |  |
+| Default Value       | OFF                             |  |
+
+When this variable is set to 0, epoch transactions with no changes are not written to the binary log, although a row is still written even for an empty epoch in ndb\_binlog\_index.
+
+<span id="page-130-1"></span>• [ndb\\_log\\_empty\\_update](#page-130-1)
+
+| Command-Line Format | ndb-log-empty-update[={OFF ON}] |
+|---------------------|---------------------------------|
+| System Variable     | ndb_log_empty_update            |
+| Scope               | Global                          |
+| Dynamic             | Yes                             |
+| Type                | Boolean                         |
+| Default Value       | OFF                             |
+
+When this variable is set to ON (1), update transactions with no changes are written to the binary log, even when log\_slave\_updates is enabled.
+
+<span id="page-130-2"></span>• [ndb\\_log\\_exclusive\\_reads](#page-130-2)
+
+| Command-Line Format | ndb-log-exclusive-reads[={OFF ON}] |
+|---------------------|------------------------------------|
+| System Variable     | ndb_log_exclusive_reads            |
+| Scope               | Global, Session                    |
+| Dynamic             | 3303<br>Yes                        |
+
+| Type          | Boolean |
+|---------------|---------|
+| Default Value | 0       |
+
+This variable determines whether primary key reads are logged with exclusive locks, which allows for NDB Cluster Replication conflict detection and resolution based on read conflicts. To enable these locks, set the value of ndb\_log\_exclusive\_reads to 1. 0, which disables such locking, is the default.
+
+For more information, see Read conflict detection and resolution.
+
+<span id="page-131-0"></span>• [ndb\\_log\\_orig](#page-131-0)
+
+| Command-Line Format | ndb-log-orig[={OFF ON}] |
+|---------------------|-------------------------|
+| System Variable     | ndb_log_orig            |
+| Scope               | Global                  |
+| Dynamic             | No                      |
+| Type                | Boolean                 |
+| Default Value       | OFF                     |
+
+Shows whether the originating server ID and epoch are logged in the ndb\_binlog\_index table. Set using the [--ndb-log-orig](#page-116-0) server option.
+
+<span id="page-131-1"></span>• [ndb\\_log\\_transaction\\_id](#page-131-1)
+
+| System Variable | ndb_log_transaction_id |
+|-----------------|------------------------|
+| Scope           | Global                 |
+| Dynamic         | No                     |
+| Type            | Boolean                |
+| Default Value   | OFF                    |
+
+This read-only, Boolean system variable shows whether a replica mysqld writes NDB transaction IDs in the binary log (required to use "active-active" NDB Cluster Replication with NDB \$EPOCH\_TRANS() conflict detection). To change the setting, use the [--ndb-log-transaction](#page-116-1)[id](#page-116-1) option.
+
+[ndb\\_log\\_transaction\\_id](#page-131-1) is not supported in mainline MySQL Server 5.7.
+
+For more information, see Section 21.7.11, "NDB Cluster Replication Conflict Resolution".
+
+<span id="page-131-2"></span>• [ndb\\_optimized\\_node\\_selection](#page-131-2)
+
+| Command-Line Format | ndb-optimized-node-selection=# |
+|---------------------|--------------------------------|
+| System Variable     | ndb_optimized_node_selection   |
+| Scope               | Global                         |
+| Dynamic             | No                             |
+| Type                | Integer                        |
+| Default Value       | 3                              |
+| Minimum Value       | 0                              |
+
+| Maximum Value | 3 |
+|---------------|---|
+|---------------|---|
+
+There are two forms of optimized node selection, described here:
+
+- 1. The SQL node uses promixity to determine the transaction coordinator; that is, the "closest" data node to the SQL node is chosen as the transaction coordinator. For this purpose, a data node having a shared memory connection with the SQL node is considered to be "closest" to the SQL node; the next closest (in order of decreasing proximity) are: TCP connection to localhost, followed by TCP connection from a host other than localhost.
+- 2. The SQL thread uses distribution awareness to select the data node. That is, the data node housing the cluster partition accessed by the first statement of a given transaction is used as the transaction coordinator for the entire transaction. (This is effective only if the first statement of the transaction accesses no more than one cluster partition.)
+
+This option takes one of the integer values 0, 1, 2, or 3. 3 is the default. These values affect node selection as follows:
+
+- 0: Node selection is not optimized. Each data node is employed as the transaction coordinator 8 times before the SQL thread proceeds to the next data node.
+- 1: Proximity to the SQL node is used to determine the transaction coordinator.
+- 2: Distribution awareness is used to select the transaction coordinator. However, if the first statement of the transaction accesses more than one cluster partition, the SQL node reverts to the round-robin behavior seen when this option is set to 0.
+- 3: If distribution awareness can be employed to determine the transaction coordinator, then it is used; otherwise proximity is used to select the transaction coordinator. (This is the default behavior.)
+
+Proximity is determined as follows:
+
+- 1. Start with the value set for the [Group](#page-155-1) parameter (default 55).
+- 2. For an API node sharing the same host with other API nodes, decrement the value by 1. Assuming the default value for Group, the effective value for data nodes on same host as the API node is 54, and for remote data nodes 55.
+- 3. (NDB 7.5.2 and later:) Setting [ndb\\_data\\_node\\_neighbour](#page-122-1) further decreases the effective Group value by 50, causing this node to be regarded as the nearest node. This is needed only when all data nodes are on hosts other than that hosts the API node and it is desirable to dedicate one of them to the API node. In normal cases, the default adjustment described previously is sufficient.
+
+Frequent changes in ndb\_data\_node\_neighbour are not advisable, since this changes the state of the cluster connection and thus may disrupt the selection algorithm for new transactions from each thread until it stablilizes.
+
+<span id="page-132-0"></span>• [ndb\\_read\\_backup](#page-132-0)
+
+| Command-Line Format | ndb-read-backup[={OFF ON}] |
+|---------------------|----------------------------|
+| System Variable     | ndb_read_backup            |
+| Scope               | Global                     |
+| Dynamic             | Yes                        |
+| Type                | Boolean                    |
+
+| Default Value | OFF |  |
+|---------------|-----|--|
+|---------------|-----|--|
+
+Enable read from any fragment replica for any NDB table subsequently created; doing so greatly improves the table read performance at a relatively small cost to writes.
+
+If the SQL node and the data node use the same host name or IP address, this fact is detected automatically, so that the preference is to send reads to the same host. If these nodes are on the same host but use different IP addresses, you can tell the SQL node to use the correct data node by setting the value of [ndb\\_data\\_node\\_neighbour](#page-122-1) on the SQL node to the node ID of the data node.
+
+To enable or disable read from any fragment replica for an individual table, you can set the NDB\_TABLE option READ\_BACKUP for the table accordingly, in a CREATE TABLE or ALTER TABLE statement; see Section 13.1.18.9, "Setting NDB Comment Options", for more information.
+
+#### Added in NDB 7.5.2.
+
+<span id="page-133-0"></span>• [ndb\\_recv\\_thread\\_activation\\_threshold](#page-133-0)
+
+| Command-Line Format | ndb-recv-thread-activation<br>threshold=# |
+|---------------------|-------------------------------------------|
+| System Variable     | ndb_recv_thread_activation_threshold      |
+| Scope               | Global                                    |
+| Dynamic             | Yes                                       |
+| Type                | Integer                                   |
+| Default Value       | 8                                         |
+| Minimum Value       | 0 (MIN_ACTIVATION_THRESHOLD)              |
+| Maximum Value       | 16 (MAX_ACTIVATION_THRESHOLD)             |
+
+When this number of concurrently active threads is reached, the receive thread takes over polling of the cluster connection.
+
+This variable is global in scope. It can also be set at startup.
+
+<span id="page-133-1"></span>• [ndb\\_recv\\_thread\\_cpu\\_mask](#page-133-1)
+
+| Command-Line Format | ndb-recv-thread-cpu-mask=mask |
+|---------------------|-------------------------------|
+| System Variable     | ndb_recv_thread_cpu_mask      |
+| Scope               | Global                        |
+| Dynamic             | Yes                           |
+| Type                | Bitmap                        |
+| Default Value       | [empty]                       |
+
+CPU mask for locking receiver threads to specific CPUs. This is specified as a hexadecimal bitmask. For example, 0x33 means that one CPU is used per receiver thread. An empty string is the default; setting ndb\_recv\_thread\_cpu\_mask to this value removes any receiver thread locks previously set.
+
+This variable is global in scope. It can also be set at startup.
+
+• [ndb\\_report\\_thresh\\_binlog\\_epoch\\_slip](#page-133-2)
+
+<span id="page-133-2"></span>
+
+|      | Command-Line Format | ndb-report-thresh-binlog-epoch<br>slip=# |
+|------|---------------------|------------------------------------------|
+| 3306 | System Variable     | ndb_report_thresh_binlog_epoch_slip      |
+
+| Scope         | Global  |
+|---------------|---------|
+| Dynamic       | Yes     |
+| Type          | Integer |
+| Default Value | 10      |
+| Minimum Value | 0       |
+| Maximum Value | 256     |
+
+In NDB 7.5.4 and later, this represents the threshold for the number of epochs completely buffered in the event buffer, but not yet consumed by the binlog injector thread. When this degree of slippage (lag) is exceeded, an event buffer status message is reported, with BUFFERED\_EPOCHS\_OVER\_THRESHOLD supplied as the reason (see Section 21.6.2.3, "Event Buffer Reporting in the Cluster Log"). Slip is increased when an epoch is received from data nodes and buffered completely in the event buffer; it is decreased when an epoch is consumed by the binlog injector thread, it is reduced. Empty epochs are buffered and queued, and so included in this calculation only when this is enabled using the [Ndb::setEventBufferQueueEmptyEpoch\(\)](https://dev.mysql.com/doc/ndbapi/en/ndb-ndb.md#ndb-ndb-seteventbufferqueueemptyepoch) method from the NDB API.
+
+Prior to NDB 7.5.4, the value of this vairable served as a threshold for the number of epochs to be behind before reporting binary log status. In these previous releases, a value of 3—the default means that if the difference between which epoch has been received from the storage nodes and which epoch has been applied to the binary log is 3 or more, a status message is then sent to the cluster log.
+
+<span id="page-134-0"></span>• [ndb\\_report\\_thresh\\_binlog\\_mem\\_usage](#page-134-0)
+
+| Command-Line Format | ndb-report-thresh-binlog-mem<br>usage=# |
+|---------------------|-----------------------------------------|
+| System Variable     | ndb_report_thresh_binlog_mem_usage      |
+| Scope               | Global                                  |
+| Dynamic             | Yes                                     |
+| Type                | Integer                                 |
+| Default Value       | 10                                      |
+| Minimum Value       | 0                                       |
+| Maximum Value       | 10                                      |
+
+This is a threshold on the percentage of free memory remaining before reporting binary log status. For example, a value of 10 (the default) means that if the amount of available memory for receiving binary log data from the data nodes falls below 10%, a status message is sent to the cluster log.
+
+<span id="page-134-1"></span>• [ndb\\_row\\_checksum](#page-134-1)
+
+| System Variable | ndb_row_checksum |
+|-----------------|------------------|
+| Scope           | Global, Session  |
+| Dynamic         | Yes              |
+| Type            | Integer          |
+| Default Value   | 1                |
+| Minimum Value   | 0                |
+| Maximum Value   | 1                |
+
+Traditionally, NDB has created tables with row checksums, which checks for hardware issues at the expense of performance. Setting ndb\_row\_checksum to 0 means that row checksums are not used for new or altered tables, which has a significant impact on performance for all types of queries. This variable is set to 1 by default, to provide backward-compatible behavior.
+
+<span id="page-135-0"></span>• [ndb\\_show\\_foreign\\_key\\_mock\\_tables](#page-135-0)
+
+| Command-Line Format | ndb-show-foreign-key-mock<br>tables[={OFF ON}] |
+|---------------------|------------------------------------------------|
+| System Variable     | ndb_show_foreign_key_mock_tables               |
+| Scope               | Global                                         |
+| Dynamic             | Yes                                            |
+| Type                | Boolean                                        |
+| Default Value       | OFF                                            |
+
+Show the mock tables used by NDB to support foreign\_key\_checks=0. When this is enabled, extra warnings are shown when creating and dropping the tables. The real (internal) name of the table can be seen in the output of SHOW CREATE TABLE.
+
+<span id="page-135-1"></span>• [ndb\\_slave\\_conflict\\_role](#page-135-1)
+
+| Command-Line Format | ndb-slave-conflict-role=value |
+|---------------------|-------------------------------|
+| System Variable     | ndb_slave_conflict_role       |
+| Scope               | Global                        |
+| Dynamic             | Yes                           |
+| Type                | Enumeration                   |
+| Default Value       | NONE                          |
+| Valid Values        | NONE                          |
+|                     | PRIMARY                       |
+|                     | SECONDARY                     |
+|                     | PASS                          |
+
+Determine the role of this SQL node (and NDB Cluster) in a circular ("active-active") replication setup. ndb\_slave\_conflict\_role can take any one of the values PRIMARY, SECONDARY, PASS, or NULL (the default). The replica SQL thread must be stopped before you can change ndb\_slave\_conflict\_role. In addition, it is not possible to change directly between PASS and either of PRIMARY or SECONDARY directly; in such cases, you must ensure that the SQL thread is stopped, then execute SET @@GLOBAL.ndb\_slave\_conflict\_role = 'NONE' first.
+
+For more information, see Section 21.7.11, "NDB Cluster Replication Conflict Resolution".
+
+<span id="page-135-2"></span>• [ndb\\_table\\_no\\_logging](#page-135-2)
+
+| System Variable | ndb_table_no_logging |
+|-----------------|----------------------|
+| Scope           | Session              |
+| Dynamic         | Yes                  |
+| Type            | Boolean              |
+| Default Value   | OFF                  |
+
+When this variable is set to ON or 1, it causes all tables created or altered using ENGINE NDB to be nonlogging; that is, no data changes for this table are written to the redo log or checkpointed to disk, just as if the table had been created or altered using the NOLOGGING option for CREATE TABLE or ALTER TABLE.
+
+For more information about nonlogging NDB tables, see NDB\_TABLE Options.
+
+[ndb\\_table\\_no\\_logging](#page-135-2) has no effect on the creation of NDB table schema files; to suppress these, use [ndb\\_table\\_temporary](#page-136-0) instead.
+
+<span id="page-136-0"></span>• [ndb\\_table\\_temporary](#page-136-0)
+
+| System Variable | ndb_table_temporary |
+|-----------------|---------------------|
+| Scope           | Session             |
+| Dynamic         | Yes                 |
+| Type            | Boolean             |
+| Default Value   | OFF                 |
+
+When set to ON or 1, this variable causes NDB tables not to be written to disk: This means that no table schema files are created, and that the tables are not logged.
+
+![](_page_136_Picture_6.jpeg)
+
+#### **Note**
+
+Setting this variable currently has no effect. This is a known issue; see Bug #34036.
+
+<span id="page-136-1"></span>• [ndb\\_use\\_copying\\_alter\\_table](#page-136-1)
+
+| System Variable | ndb_use_copying_alter_table |
+|-----------------|-----------------------------|
+| Scope           | Global, Session             |
+| Dynamic         | No                          |
+
+Forces NDB to use copying of tables in the event of problems with online ALTER TABLE operations. The default value is OFF.
+
+<span id="page-136-2"></span>• [ndb\\_use\\_exact\\_count](#page-136-2)
+
+| System Variable | ndb_use_exact_count |
+|-----------------|---------------------|
+| Scope           | Global, Session     |
+| Dynamic         | Yes                 |
+| Type            | Boolean             |
+| Default Value   | OFF                 |
+
+Forces NDB to use a count of records during SELECT COUNT(\*) query planning to speed up this type of query. The default value is OFF, which allows for faster queries overall.
+
+<span id="page-136-3"></span>• [ndb\\_use\\_transactions](#page-136-3)
+
+| Command-Line Format | ndb-use-transactions[={OFF ON}] |
+|---------------------|---------------------------------|
+| System Variable     | ndb_use_transactions            |
+| Scope               | Global, Session                 |
+| Dynamic             | Yes                             |
+| Type                | Boolean                         |
+| Default Value       | ON                              |
+
+You can disable NDB transaction support by setting this variable's value to OFF. This is generally not recommended, although it may be useful to disable transaction support within a given client session when that session is used to import one or more dump files with large transactions; this allows a
+
+multi-row insert to be executed in parts, rather than as a single transaction. In such cases, once the import has been completed, you should either reset the variable value for this session to ON, or simply terminate the session.
+
+### <span id="page-137-0"></span>• [ndb\\_version](#page-137-0)
+
+| System Variable | ndb_version |
+|-----------------|-------------|
+| Scope           | Global      |
+| Dynamic         | No          |
+| Type            | String      |
+| Default Value   |             |
+
+NDB engine version, as a composite integer.
+
+### <span id="page-137-1"></span>• [ndb\\_version\\_string](#page-137-1)
+
+| System Variable | ndb_version_string |
+|-----------------|--------------------|
+| Scope           | Global             |
+| Dynamic         | No                 |
+| Type            | String             |
+| Default Value   |                    |
+
+NDB engine version in ndb-x.y.z format.
+
+### <span id="page-137-2"></span>• [server\\_id\\_bits](#page-137-2)
+
+| Command-Line Format | server-id-bits=# |
+|---------------------|------------------|
+| System Variable     | server_id_bits   |
+| Scope               | Global           |
+| Dynamic             | No               |
+| Type                | Integer          |
+| Default Value       | 32               |
+| Minimum Value       | 7                |
+| Maximum Value       | 32               |
+
+This variable indicates the number of least significant bits within the 32-bit server\_id which actually identify the server. Indicating that the server is actually identified by fewer than 32 bits makes it possible for some of the remaining bits to be used for other purposes, such as storing user data generated by applications using the NDB API's Event API within the AnyValue of an [OperationOptions](https://dev.mysql.com/doc/ndbapi/en/ndb-ndboperation.md#ndb-ndboperation-operationoptions) structure (NDB Cluster uses the AnyValue to store the server ID).
+
+When extracting the effective server ID from server\_id for purposes such as detection of replication loops, the server ignores the remaining bits. The [server\\_id\\_bits](#page-137-2) variable is used to mask out any irrelevant bits of server\_id in the I/O and SQL threads when deciding whether an event should be ignored based on the server ID.
+
+This data can be read from the binary log by mysqlbinlog, provided that it is run with its own [server\\_id\\_bits](#page-137-2) variable set to 32 (the default).
+
+If the value of server\_id greater than or equal to 2 to the power of [server\\_id\\_bits](#page-137-2); otherwise, mysqld refuses to start.
+
+This system variable is supported only by NDB Cluster. It is not supported in the standard MySQL 5.7 Server.
+
+<span id="page-138-0"></span>• [slave\\_allow\\_batching](#page-138-0)
+
+| Command-Line Format | slave-allow-batching[={OFF ON}] |
+|---------------------|---------------------------------|
+| System Variable     | slave_allow_batching            |
+| Scope               | Global                          |
+| Dynamic             | Yes                             |
+| Type                | Boolean                         |
+| Default Value       | OFF                             |
+
+Whether or not batched updates are enabled on NDB Cluster replicas.
+
+Allowing batched updates on the replica greatly improves performance, particularly when replicating TEXT, BLOB, and JSON columns. For this reason, you should always enable slave\_allow\_batching when using NDB replication. Beginning with NDB 7.6.23, a warning is issued whenever this variable is set to OFF.
+
+Setting this variable has an effect only when using replication with the NDB storage engine; in MySQL Server 5.7, it is present but does nothing. For more information, see Section 21.7.6, "Starting NDB Cluster Replication (Single Replication Channel)".
+
+<span id="page-138-1"></span>• [transaction\\_allow\\_batching](#page-138-1)
+
+| System Variable | transaction_allow_batching |
+|-----------------|----------------------------|
+| Scope           | Session                    |
+| Dynamic         | Yes                        |
+| Type            | Boolean                    |
+| Default Value   | OFF                        |
+
+When set to 1 or ON, this variable enables batching of statements within the same transaction. To use this variable, autocommit must first be disabled by setting it to 0 or OFF; otherwise, setting [transaction\\_allow\\_batching](#page-138-1) has no effect.
+
+It is safe to use this variable with transactions that performs writes only, as having it enabled can lead to reads from the "before" image. You should ensure that any pending transactions are committed (using an explicit COMMIT if desired) before issuing a SELECT.
+
+![](_page_138_Picture_10.jpeg)
+
+#### **Important**
+
+[transaction\\_allow\\_batching](#page-138-1) should not be used whenever there is the possibility that the effects of a given statement depend on the outcome of a previous statement within the same transaction.
+
+This variable is currently supported for NDB Cluster only.
+
+The system variables in the following list all relate to the ndbinfo information database.
+
+<span id="page-138-2"></span>• [ndbinfo\\_database](#page-138-2)
+
+| System Variable | ndbinfo_database |
+|-----------------|------------------|
+| Scope           | Global           |
+| Dynamic         | No               |
+| Type            | String           |
+| Default Value   | ndbinfo          |
+
+Shows the name used for the NDB information database; the default is ndbinfo. This is a read-only variable whose value is determined at compile time.
+
+<span id="page-139-0"></span>• [ndbinfo\\_max\\_bytes](#page-139-0)
+
+| Command-Line Format | ndbinfo-max-bytes=# |
+|---------------------|---------------------|
+| System Variable     | ndbinfo_max_bytes   |
+| Scope               | Global, Session     |
+| Dynamic             | Yes                 |
+| Type                | Integer             |
+| Default Value       | 0                   |
+| Minimum Value       | 0                   |
+| Maximum Value       | 65535               |
+
+Used in testing and debugging only.
+
+<span id="page-139-1"></span>• [ndbinfo\\_max\\_rows](#page-139-1)
+
+| Command-Line Format | ndbinfo-max-rows=# |
+|---------------------|--------------------|
+| System Variable     | ndbinfo_max_rows   |
+| Scope               | Global, Session    |
+| Dynamic             | Yes                |
+| Type                | Integer            |
+| Default Value       | 10                 |
+| Minimum Value       | 1                  |
+| Maximum Value       | 256                |
+
+Used in testing and debugging only.
+
+<span id="page-139-2"></span>• [ndbinfo\\_offline](#page-139-2)
+
+| System Variable | ndbinfo_offline |
+|-----------------|-----------------|
+| Scope           | Global          |
+| Dynamic         | Yes             |
+| Type            | Boolean         |
+| Default Value   | OFF             |
+
+Place the ndbinfo database into offline mode, in which tables and views can be opened even when they do not actually exist, or when they exist but have different definitions in NDB. No rows are returned from such tables (or views).
+
+• [ndbinfo\\_show\\_hidden](#page-139-3)
+
+<span id="page-139-3"></span>
+
+|      | Command-Line Format | ndbinfo-show-hidden[={OFF ON}] |
+|------|---------------------|--------------------------------|
+|      | System Variable     | ndbinfo_show_hidden            |
+|      | Scope               | Global, Session                |
+|      | Dynamic             | Yes                            |
+|      | Type                | Boolean                        |
+| 3312 | Default Value       | OFF                            |
+
+| Valid Values | ON  |
+|--------------|-----|
+|              | OFF |
+
+Whether or not the ndbinfo database's underlying internal tables are shown in the mysql client. The default is OFF.
+
+![](_page_140_Picture_3.jpeg)
+
+#### **Note**
+
+When ndbinfo\_show\_hidden is enabled, the internal tables are shown in the ndbinfo database only; they are not visible in TABLES or other INFORMATION\_SCHEMA tables, regardless of the variable's setting.
+
+<span id="page-140-1"></span>• [ndbinfo\\_table\\_prefix](#page-140-1)
+
+| System Variable | ndbinfo_table_prefix |
+|-----------------|----------------------|
+| Scope           | Global               |
+| Dynamic         | No                   |
+| Type            | String               |
+| Default Value   | ndb\$                |
+
+The prefix used in naming the ndbinfo database's base tables (normally hidden, unless exposed by setting [ndbinfo\\_show\\_hidden](#page-139-3)). This is a read-only variable whose default value is ndb\$; the prefix itself is determined at compile time.
+
+<span id="page-140-2"></span>• [ndbinfo\\_version](#page-140-2)
+
+| System Variable | ndbinfo_version |
+|-----------------|-----------------|
+| Scope           | Global          |
+| Dynamic         | No              |
+| Type            | String          |
+| Default Value   |                 |
+
+Shows the version of the ndbinfo engine in use; read-only.
+
+# <span id="page-140-0"></span>**NDB Cluster Status Variables**
+
+This section provides detailed information about MySQL server status variables that relate to NDB Cluster and the NDB storage engine. For status variables not specific to NDB Cluster, and for general information on using status variables, see Section 5.1.9, "Server Status Variables".
+
+<span id="page-140-3"></span>• [Handler\\_discover](#page-140-3)
+
+The MySQL server can ask the NDBCLUSTER storage engine if it knows about a table with a given name. This is called discovery. [Handler\\_discover](#page-140-3) indicates the number of times that tables have been discovered using this mechanism.
+
+<span id="page-140-4"></span>• [Ndb\\_api\\_adaptive\\_send\\_deferred\\_count](#page-140-4)
+
+Number of adaptive send calls that were not actually sent.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-140-5"></span>• [Ndb\\_api\\_adaptive\\_send\\_deferred\\_count\\_session](#page-140-5)
+
+Number of adaptive send calls that were not actually sent.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-141-0"></span>• [Ndb\\_api\\_adaptive\\_send\\_deferred\\_count\\_slave](#page-141-0)
+
+Number of adaptive send calls that were not actually sent by this replica.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-141-1"></span>• [Ndb\\_api\\_adaptive\\_send\\_forced\\_count](#page-141-1)
+
+Number of adaptive send calls using forced-send sent by this MySQL Server (SQL node).
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-141-2"></span>• [Ndb\\_api\\_adaptive\\_send\\_forced\\_count\\_session](#page-141-2)
+
+Number of adaptive send calls using forced-send sent in this client session.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-141-3"></span>• [Ndb\\_api\\_adaptive\\_send\\_forced\\_count\\_slave](#page-141-3)
+
+Number of adaptive send calls using forced-send sent by this replica.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-141-4"></span>• [Ndb\\_api\\_adaptive\\_send\\_unforced\\_count](#page-141-4)
+
+Number of adaptive send calls without forced-send sent by this MySQL server (SQL node).
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-141-5"></span>• [Ndb\\_api\\_adaptive\\_send\\_unforced\\_count\\_session](#page-141-5)
+
+Number of adaptive send calls without forced-send sent in this client session.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-141-6"></span>• [Ndb\\_api\\_adaptive\\_send\\_unforced\\_count\\_slave](#page-141-6)
+
+Number of adaptive send calls without forced-send sent by this replica.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-141-7"></span>• [Ndb\\_api\\_bytes\\_sent\\_count\\_session](#page-141-7)
+
+Amount of data (in bytes) sent to the data nodes in this client session.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it relates to the current session only, and is not affected by any other clients of this mysqld.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-141-8"></span>• [Ndb\\_api\\_bytes\\_sent\\_count\\_slave](#page-141-8)
+
+Amount of data (in bytes) sent to the data nodes by this replica.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope. If this MySQL server does not act as a replica, or does not use NDB tables, this value is always 0.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-141-9"></span>• [Ndb\\_api\\_bytes\\_sent\\_count](#page-141-9)
+
+Amount of data (in bytes) sent to the data nodes by this MySQL Server (SQL node).
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-142-0"></span>• [Ndb\\_api\\_bytes\\_received\\_count\\_session](#page-142-0)
+
+Amount of data (in bytes) received from the data nodes in this client session.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it relates to the current session only, and is not affected by any other clients of this mysqld.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-142-1"></span>• [Ndb\\_api\\_bytes\\_received\\_count\\_slave](#page-142-1)
+
+Amount of data (in bytes) received from the data nodes by this replica.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope. If this MySQL server does not act as a replica, or does not use NDB tables, this value is always 0.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-142-2"></span>• [Ndb\\_api\\_bytes\\_received\\_count](#page-142-2)
+
+Amount of data (in bytes) received from the data nodes by this MySQL Server (SQL node).
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-142-3"></span>• [Ndb\\_api\\_event\\_data\\_count\\_injector](#page-142-3)
+
+The number of row change events received by the NDB binlog injector thread.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-142-4"></span>• [Ndb\\_api\\_event\\_data\\_count](#page-142-4)
+
+The number of row change events received by this MySQL Server (SQL node).
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-142-5"></span>• [Ndb\\_api\\_event\\_nondata\\_count\\_injector](#page-142-5)
+
+The number of events received, other than row change events, by the NDB binary log injector thread.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-143-0"></span>• [Ndb\\_api\\_event\\_nondata\\_count](#page-143-0)
+
+The number of events received, other than row change events, by this MySQL Server (SQL node).
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-143-1"></span>• [Ndb\\_api\\_event\\_bytes\\_count\\_injector](#page-143-1)
+
+The number of bytes of events received by the NDB binlog injector thread.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-143-2"></span>• [Ndb\\_api\\_event\\_bytes\\_count](#page-143-2)
+
+The number of bytes of events received by this MySQL Server (SQL node).
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-143-3"></span>• [Ndb\\_api\\_pk\\_op\\_count\\_session](#page-143-3)
+
+The number of operations in this client session based on or using primary keys. This includes operations on blob tables, implicit unlock operations, and auto-increment operations, as well as uservisible primary key operations.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it relates to the current session only, and is not affected by any other clients of this mysqld.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-143-4"></span>• [Ndb\\_api\\_pk\\_op\\_count\\_slave](#page-143-4)
+
+The number of operations by this replica based on or using primary keys. This includes operations on blob tables, implicit unlock operations, and auto-increment operations, as well as user-visible primary key operations.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope. If this MySQL server does not act as a replica, or does not use NDB tables, this value is always 0.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-143-5"></span>• [Ndb\\_api\\_pk\\_op\\_count](#page-143-5)
+
+The number of operations by this MySQL Server (SQL node) based on or using primary keys. This includes operations on blob tables, implicit unlock operations, and auto-increment operations, as well as user-visible primary key operations.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-144-0"></span>• [Ndb\\_api\\_pruned\\_scan\\_count\\_session](#page-144-0)
+
+The number of scans in this client session that have been pruned to a single partition.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it relates to the current session only, and is not affected by any other clients of this mysqld.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-144-1"></span>• [Ndb\\_api\\_pruned\\_scan\\_count\\_slave](#page-144-1)
+
+The number of scans by this replica that have been pruned to a single partition.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope. If this MySQL server does not act as a replica, or does not use NDB tables, this value is always 0.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-144-2"></span>• [Ndb\\_api\\_pruned\\_scan\\_count](#page-144-2)
+
+The number of scans by this MySQL Server (SQL node) that have been pruned to a single partition.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-144-3"></span>• [Ndb\\_api\\_range\\_scan\\_count\\_session](#page-144-3)
+
+The number of range scans that have been started in this client session.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it relates to the current session only, and is not affected by any other clients of this mysqld.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-144-4"></span>• [Ndb\\_api\\_range\\_scan\\_count\\_slave](#page-144-4)
+
+The number of range scans that have been started by this replica.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope. If this MySQL server does not act as a replica, or does not use NDB tables, this value is always 0.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-144-5"></span>• [Ndb\\_api\\_range\\_scan\\_count](#page-144-5)
+
+The number of range scans that have been started by this MySQL Server (SQL node).
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-144-6"></span>• [Ndb\\_api\\_read\\_row\\_count\\_session](#page-144-6)
+
+The total number of rows that have been read in this client session. This includes all rows read by any primary key, unique key, or scan operation made in this client session.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it relates to the current session only, and is not affected by any other clients of this mysqld. For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-145-0"></span>• [Ndb\\_api\\_read\\_row\\_count\\_slave](#page-145-0)
+
+The total number of rows that have been read by this replica. This includes all rows read by any primary key, unique key, or scan operation made by this replica.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope. If this MySQL server does not act as a replica, or does not use NDB tables, this value is always 0.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-145-1"></span>• [Ndb\\_api\\_read\\_row\\_count](#page-145-1)
+
+The total number of rows that have been read by this MySQL Server (SQL node). This includes all rows read by any primary key, unique key, or scan operation made by this MySQL Server (SQL node).
+
+You should be aware that this value may not be completely accurate with regard to rows read by SELECT COUNT(\*) queries, due to the fact that, in this case, the MySQL server actually reads pseudo-rows in the form [table fragment ID]:[number of rows in fragment] and sums the rows per fragment for all fragments in the table to derive an estimated count for all rows. Ndb\_api\_read\_row\_count uses this estimate and not the actual number of rows in the table.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-145-2"></span>• [Ndb\\_api\\_scan\\_batch\\_count\\_session](#page-145-2)
+
+The number of batches of rows received in this client session. 1 batch is defined as 1 set of scan results from a single fragment.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it relates to the current session only, and is not affected by any other clients of this mysqld.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-145-3"></span>• [Ndb\\_api\\_scan\\_batch\\_count\\_slave](#page-145-3)
+
+The number of batches of rows received by this replica. 1 batch is defined as 1 set of scan results from a single fragment.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope. If this MySQL server does not act as a replica, or does not use NDB tables, this value is always 0.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-145-4"></span>• [Ndb\\_api\\_scan\\_batch\\_count](#page-145-4)
+
+The number of batches of rows received by this MySQL Server (SQL node). 1 batch is defined as 1 set of scan results from a single fragment.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-146-0"></span>• [Ndb\\_api\\_table\\_scan\\_count\\_session](#page-146-0)
+
+The number of table scans that have been started in this client session, including scans of internal tables,.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it relates to the current session only, and is not affected by any other clients of this mysqld.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-146-1"></span>• [Ndb\\_api\\_table\\_scan\\_count\\_slave](#page-146-1)
+
+The number of table scans that have been started by this replica, including scans of internal tables,.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope. If this MySQL server does not act as a replica, or does not use NDB tables, this value is always 0.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-146-2"></span>• [Ndb\\_api\\_table\\_scan\\_count](#page-146-2)
+
+The number of table scans that have been started by this MySQL Server (SQL node), including scans of internal tables,.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-146-3"></span>• [Ndb\\_api\\_trans\\_abort\\_count\\_session](#page-146-3)
+
+The number of transactions aborted in this client session.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it relates to the current session only, and is not affected by any other clients of this mysqld.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-146-4"></span>• [Ndb\\_api\\_trans\\_abort\\_count\\_slave](#page-146-4)
+
+The number of transactions aborted by this replica.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope. If this MySQL server does not act as a replica, or does not use NDB tables, this value is always 0.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-146-5"></span>• [Ndb\\_api\\_trans\\_abort\\_count](#page-146-5)
+
+The number of transactions aborted by this MySQL Server (SQL node).
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-146-6"></span>• [Ndb\\_api\\_trans\\_close\\_count\\_session](#page-146-6)
+
+The number of transactions closed in this client session. This value may be greater than the sum of [Ndb\\_api\\_trans\\_commit\\_count\\_session](#page-147-0) and [Ndb\\_api\\_trans\\_abort\\_count\\_session](#page-146-3), since some transactions may have been rolled back.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it relates to the current session only, and is not affected by any other clients of this mysqld.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-147-1"></span>• [Ndb\\_api\\_trans\\_close\\_count\\_slave](#page-147-1)
+
+The number of transactions closed by this replica. This value may be greater than the sum of [Ndb\\_api\\_trans\\_commit\\_count\\_slave](#page-147-2) and [Ndb\\_api\\_trans\\_abort\\_count\\_slave](#page-146-4), since some transactions may have been rolled back.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope. If this MySQL server does not act as a replica, or does not use NDB tables, this value is always 0.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-147-3"></span>• [Ndb\\_api\\_trans\\_close\\_count](#page-147-3)
+
+The number of transactions closed by this MySQL Server (SQL node). This value may be greater than the sum of [Ndb\\_api\\_trans\\_commit\\_count](#page-147-4) and [Ndb\\_api\\_trans\\_abort\\_count](#page-146-5), since some transactions may have been rolled back.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-147-0"></span>• [Ndb\\_api\\_trans\\_commit\\_count\\_session](#page-147-0)
+
+The number of transactions committed in this client session.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it relates to the current session only, and is not affected by any other clients of this mysqld.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-147-2"></span>• [Ndb\\_api\\_trans\\_commit\\_count\\_slave](#page-147-2)
+
+The number of transactions committed by this replica.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope. If this MySQL server does not act as a replica, or does not use NDB tables, this value is always 0.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-147-4"></span>• [Ndb\\_api\\_trans\\_commit\\_count](#page-147-4)
+
+The number of transactions committed by this MySQL Server (SQL node).
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-148-0"></span>• [Ndb\\_api\\_trans\\_local\\_read\\_row\\_count\\_session](#page-148-0)
+
+The total number of rows that have been read in this client session. This includes all rows read by any primary key, unique key, or scan operation made in this client session.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it relates to the current session only, and is not affected by any other clients of this mysqld.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-148-1"></span>• [Ndb\\_api\\_trans\\_local\\_read\\_row\\_count\\_slave](#page-148-1)
+
+The total number of rows that have been read by this replica. This includes all rows read by any primary key, unique key, or scan operation made by this replica.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope. If this MySQL server does not act as a replica, or does not use NDB tables, this value is always 0.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-148-2"></span>• [Ndb\\_api\\_trans\\_local\\_read\\_row\\_count](#page-148-2)
+
+The total number of rows that have been read by this MySQL Server (SQL node). This includes all rows read by any primary key, unique key, or scan operation made by this MySQL Server (SQL node).
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-148-3"></span>• [Ndb\\_api\\_trans\\_start\\_count\\_session](#page-148-3)
+
+The number of transactions started in this client session.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it relates to the current session only, and is not affected by any other clients of this mysqld.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-148-4"></span>• [Ndb\\_api\\_trans\\_start\\_count\\_slave](#page-148-4)
+
+The number of transactions started by this replica.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope. If this MySQL server does not act as a replica, or does not use NDB tables, this value is always 0.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-148-5"></span>• [Ndb\\_api\\_trans\\_start\\_count](#page-148-5)
+
+The number of transactions started by this MySQL Server (SQL node).
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-148-6"></span>• [Ndb\\_api\\_uk\\_op\\_count\\_session](#page-148-6)
+
+The number of operations in this client session based on or using unique keys.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it relates to the current session only, and is not affected by any other clients of this mysqld.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-149-0"></span>• [Ndb\\_api\\_uk\\_op\\_count\\_slave](#page-149-0)
+
+The number of operations by this replica based on or using unique keys.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope. If this MySQL server does not act as a replica, or does not use NDB tables, this value is always 0.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-149-1"></span>• [Ndb\\_api\\_uk\\_op\\_count](#page-149-1)
+
+The number of operations by this MySQL Server (SQL node) based on or using unique keys.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-149-2"></span>• [Ndb\\_api\\_wait\\_exec\\_complete\\_count\\_session](#page-149-2)
+
+The number of times a thread has been blocked in this client session while waiting for execution of an operation to complete. This includes all [execute\(\)](https://dev.mysql.com/doc/ndbapi/en/ndb-ndbtransaction.md#ndb-ndbtransaction-execute) calls as well as implicit executes for blob and auto-increment operations not visible to clients.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it relates to the current session only, and is not affected by any other clients of this mysqld.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-149-3"></span>• [Ndb\\_api\\_wait\\_exec\\_complete\\_count\\_slave](#page-149-3)
+
+The number of times a thread has been blocked by this replica while waiting for execution of an operation to complete. This includes all [execute\(\)](https://dev.mysql.com/doc/ndbapi/en/ndb-ndbtransaction.md#ndb-ndbtransaction-execute) calls as well as implicit executes for blob and auto-increment operations not visible to clients.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope. If this MySQL server does not act as a replica, or does not use NDB tables, this value is always 0.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-149-4"></span>• [Ndb\\_api\\_wait\\_exec\\_complete\\_count](#page-149-4)
+
+The number of times a thread has been blocked by this MySQL Server (SQL node) while waiting for execution of an operation to complete. This includes all [execute\(\)](https://dev.mysql.com/doc/ndbapi/en/ndb-ndbtransaction.md#ndb-ndbtransaction-execute) calls as well as implicit executes for blob and auto-increment operations not visible to clients.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-149-5"></span>• [Ndb\\_api\\_wait\\_meta\\_request\\_count\\_session](#page-149-5)
+
+The number of times a thread has been blocked in this client session waiting for a metadata-based signal, such as is expected for DDL requests, new epochs, and seizure of transaction records.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it relates to the current session only, and is not affected by any other clients of this mysqld.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-150-0"></span>• [Ndb\\_api\\_wait\\_meta\\_request\\_count\\_slave](#page-150-0)
+
+The number of times a thread has been blocked by this replica waiting for a metadata-based signal, such as is expected for DDL requests, new epochs, and seizure of transaction records.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope. If this MySQL server does not act as a replica, or does not use NDB tables, this value is always 0.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-150-1"></span>• [Ndb\\_api\\_wait\\_meta\\_request\\_count](#page-150-1)
+
+The number of times a thread has been blocked by this MySQL Server (SQL node) waiting for a metadata-based signal, such as is expected for DDL requests, new epochs, and seizure of transaction records.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-150-2"></span>• [Ndb\\_api\\_wait\\_nanos\\_count\\_session](#page-150-2)
+
+Total time (in nanoseconds) spent in this client session waiting for any type of signal from the data nodes.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it relates to the current session only, and is not affected by any other clients of this mysqld.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-150-3"></span>• [Ndb\\_api\\_wait\\_nanos\\_count\\_slave](#page-150-3)
+
+Total time (in nanoseconds) spent by this replica waiting for any type of signal from the data nodes.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope. If this MySQL server does not act as a replica, or does not use NDB tables, this value is always 0.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-150-4"></span>• [Ndb\\_api\\_wait\\_nanos\\_count](#page-150-4)
+
+Total time (in nanoseconds) spent by this MySQL Server (SQL node) waiting for any type of signal from the data nodes.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-151-1"></span>• [Ndb\\_api\\_wait\\_scan\\_result\\_count\\_session](#page-151-1)
+
+The number of times a thread has been blocked in this client session while waiting for a scan-based signal, such as when waiting for more results from a scan, or when waiting for a scan to close.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it relates to the current session only, and is not affected by any other clients of this mysqld.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-151-2"></span>• [Ndb\\_api\\_wait\\_scan\\_result\\_count\\_slave](#page-151-2)
+
+The number of times a thread has been blocked by this replica while waiting for a scan-based signal, such as when waiting for more results from a scan, or when waiting for a scan to close.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope. If this MySQL server does not act as a replica, or does not use NDB tables, this value is always 0.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-151-3"></span>• [Ndb\\_api\\_wait\\_scan\\_result\\_count](#page-151-3)
+
+The number of times a thread has been blocked by this MySQL Server (SQL node) while waiting for a scan-based signal, such as when waiting for more results from a scan, or when waiting for a scan to close.
+
+Although this variable can be read using either SHOW GLOBAL STATUS or SHOW SESSION STATUS, it is effectively global in scope.
+
+For more information, see Section 21.6.14, "NDB API Statistics Counters and Variables".
+
+<span id="page-151-0"></span>• [Ndb\\_cluster\\_node\\_id](#page-151-0)
+
+If the server is acting as an NDB Cluster node, then the value of this variable its node ID in the cluster.
+
+If the server is not part of an NDB Cluster, then the value of this variable is 0.
+
+<span id="page-151-4"></span>• [Ndb\\_config\\_from\\_host](#page-151-4)
+
+If the server is part of an NDB Cluster, the value of this variable is the host name or IP address of the Cluster management server from which it gets its configuration data.
+
+If the server is not part of an NDB Cluster, then the value of this variable is an empty string.
+
+<span id="page-151-5"></span>• [Ndb\\_config\\_from\\_port](#page-151-5)
+
+If the server is part of an NDB Cluster, the value of this variable is the number of the port through which it is connected to the Cluster management server from which it gets its configuration data.
+
+If the server is not part of an NDB Cluster, then the value of this variable is 0.
+
+<span id="page-151-6"></span>• [Ndb\\_conflict\\_fn\\_epoch](#page-151-6)
+
+Used in NDB Cluster Replication conflict resolution, this variable shows the number of rows found to be in conflict using NDB\$EPOCH() conflict resolution on a given mysqld since the last time it was restarted.
+
+For more information, see Section 21.7.11, "NDB Cluster Replication Conflict Resolution".
+
+<span id="page-152-0"></span>• [Ndb\\_conflict\\_fn\\_epoch\\_trans](#page-152-0)
+
+Used in NDB Cluster Replication conflict resolution, this variable shows the number of rows found to be in conflict using NDB\$EPOCH\_TRANS() conflict resolution on a given mysqld since the last time it was restarted.
+
+For more information, see Section 21.7.11, "NDB Cluster Replication Conflict Resolution".
+
+<span id="page-152-1"></span>• [Ndb\\_conflict\\_fn\\_epoch2](#page-152-1)
+
+Shows the number of rows found to be in conflict in NDB Cluster Replication conflict resolution, when using NDB\$EPOCH2(), on the source designated as the primary since the last time it was restarted.
+
+For more information, see NDB\$EPOCH2().
+
+<span id="page-152-2"></span>• [Ndb\\_conflict\\_fn\\_epoch2\\_trans](#page-152-2)
+
+Used in NDB Cluster Replication conflict resolution, this variable shows the number of rows found to be in conflict using NDB\$EPOCH\_TRANS2() conflict resolution on a given mysqld since the last time it was restarted.
+
+For more information, see NDB\$EPOCH2\_TRANS().
+
+<span id="page-152-3"></span>• [Ndb\\_conflict\\_fn\\_max](#page-152-3)
+
+Used in NDB Cluster Replication conflict resolution, this variable shows the number of times that a row was not applied on the current SQL node due to "greatest timestamp wins" conflict resolution since the last time that this mysqld was started.
+
+For more information, see Section 21.7.11, "NDB Cluster Replication Conflict Resolution".
+
+<span id="page-152-4"></span>• [Ndb\\_conflict\\_fn\\_max\\_del\\_win](#page-152-4)
+
+Shows the number of times that a row was rejected on the current SQL node due to NDB Cluster Replication conflict resolution using NDB\$MAX\_DELETE\_WIN(), since the last time that this mysqld was started.
+
+For more information, see Section 21.7.11, "NDB Cluster Replication Conflict Resolution".
+
+<span id="page-152-5"></span>• [Ndb\\_conflict\\_fn\\_old](#page-152-5)
+
+Used in NDB Cluster Replication conflict resolution, this variable shows the number of times that a row was not applied as the result of "same timestamp wins" conflict resolution on a given mysqld since the last time it was restarted.
+
+For more information, see Section 21.7.11, "NDB Cluster Replication Conflict Resolution".
+
+<span id="page-152-6"></span>• [Ndb\\_conflict\\_last\\_conflict\\_epoch](#page-152-6)
+
+The most recent epoch in which a conflict was detected on this replica. You can compare this value with [Ndb\\_slave\\_max\\_replicated\\_epoch](#page-154-4); if Ndb\_slave\_max\_replicated\_epoch is greater than Ndb\_conflict\_last\_conflict\_epoch, no conflicts have yet been detected.
+
+See Section 21.7.11, "NDB Cluster Replication Conflict Resolution", for more information.
+
+<span id="page-152-7"></span>• [Ndb\\_conflict\\_reflected\\_op\\_discard\\_count](#page-152-7)
+
+When using NDB Cluster Replication conflict resolution, this is the number of reflected operations that were not applied on the secondary, due to encountering an error during execution.
+
+See Section 21.7.11, "NDB Cluster Replication Conflict Resolution", for more information.
+
+<span id="page-152-8"></span>• [Ndb\\_conflict\\_reflected\\_op\\_prepare\\_count](#page-152-8)
+
+When using conflict resolution with NDB Cluster Replication, this status variable contains the number of reflected operations that have been defined (that is, prepared for execution on the secondary).
+
+See Section 21.7.11, "NDB Cluster Replication Conflict Resolution".
+
+<span id="page-153-0"></span>• [Ndb\\_conflict\\_refresh\\_op\\_count](#page-153-0)
+
+When using conflict resolution with NDB Cluster Replication, this gives the number of refresh operations that have been prepared for execution on the secondary.
+
+See Section 21.7.11, "NDB Cluster Replication Conflict Resolution", for more information.
+
+<span id="page-153-1"></span>• [Ndb\\_conflict\\_last\\_stable\\_epoch](#page-153-1)
+
+Number of rows found to be in conflict by a transactional conflict function
+
+See Section 21.7.11, "NDB Cluster Replication Conflict Resolution", for more information.
+
+<span id="page-153-2"></span>• [Ndb\\_conflict\\_trans\\_row\\_conflict\\_count](#page-153-2)
+
+Used in NDB Cluster Replication conflict resolution, this status variable shows the number of rows found to be directly in-conflict by a transactional conflict function on a given mysqld since the last time it was restarted.
+
+Currently, the only transactional conflict detection function supported by NDB Cluster is NDB\$EPOCH\_TRANS(), so this status variable is effectively the same as [Ndb\\_conflict\\_fn\\_epoch\\_trans](#page-152-0).
+
+For more information, see Section 21.7.11, "NDB Cluster Replication Conflict Resolution".
+
+<span id="page-153-3"></span>• [Ndb\\_conflict\\_trans\\_row\\_reject\\_count](#page-153-3)
+
+Used in NDB Cluster Replication conflict resolution, this status variable shows the total number of rows realigned due to being determined as conflicting by a transactional conflict detection function. This includes not only [Ndb\\_conflict\\_trans\\_row\\_conflict\\_count](#page-153-2), but any rows in or dependent on conflicting transactions.
+
+For more information, see Section 21.7.11, "NDB Cluster Replication Conflict Resolution".
+
+<span id="page-153-4"></span>• [Ndb\\_conflict\\_trans\\_reject\\_count](#page-153-4)
+
+Used in NDB Cluster Replication conflict resolution, this status variable shows the number of transactions found to be in conflict by a transactional conflict detection function.
+
+For more information, see Section 21.7.11, "NDB Cluster Replication Conflict Resolution".
+
+<span id="page-153-5"></span>• [Ndb\\_conflict\\_trans\\_detect\\_iter\\_count](#page-153-5)
+
+Used in NDB Cluster Replication conflict resolution, this shows the number of internal iterations required to commit an epoch transaction. Should be (slightly) greater than or equal to [Ndb\\_conflict\\_trans\\_conflict\\_commit\\_count](#page-153-6).
+
+For more information, see Section 21.7.11, "NDB Cluster Replication Conflict Resolution".
+
+<span id="page-153-6"></span>• [Ndb\\_conflict\\_trans\\_conflict\\_commit\\_count](#page-153-6)
+
+Used in NDB Cluster Replication conflict resolution, this shows the number of epoch transactions committed after they required transactional conflict handling.
+
+For more information, see Section 21.7.11, "NDB Cluster Replication Conflict Resolution".
+
+<span id="page-153-7"></span>• [Ndb\\_epoch\\_delete\\_delete\\_count](#page-153-7)
+
+When using delete-delete conflict detection, this is the number of delete-delete conflicts detected, where a delete operation is applied, but the indicated row does not exist.
+
+<span id="page-154-5"></span>• [Ndb\\_execute\\_count](#page-154-5)
+
+Provides the number of round trips to the NDB kernel made by operations.
+
+<span id="page-154-6"></span>• [Ndb\\_last\\_commit\\_epoch\\_server](#page-154-6)
+
+The epoch most recently committed by NDB.
+
+<span id="page-154-7"></span>• [Ndb\\_last\\_commit\\_epoch\\_session](#page-154-7)
+
+The epoch most recently committed by this NDB client.
+
+<span id="page-154-8"></span>• [Ndb\\_number\\_of\\_data\\_nodes](#page-154-8)
+
+If the server is part of an NDB Cluster, the value of this variable is the number of data nodes in the cluster.
+
+If the server is not part of an NDB Cluster, then the value of this variable is 0.
+
+<span id="page-154-0"></span>• [Ndb\\_pushed\\_queries\\_defined](#page-154-0)
+
+The total number of joins pushed down to the NDB kernel for distributed handling on the data nodes.
+
+![](_page_154_Picture_13.jpeg)
+
+#### **Note**
+
+Joins tested using EXPLAIN that can be pushed down contribute to this number.
+
+<span id="page-154-1"></span>• [Ndb\\_pushed\\_queries\\_dropped](#page-154-1)
+
+The number of joins that were pushed down to the NDB kernel but that could not be handled there.
+
+<span id="page-154-2"></span>• [Ndb\\_pushed\\_queries\\_executed](#page-154-2)
+
+The number of joins successfully pushed down to NDB and executed there.
+
+<span id="page-154-3"></span>• [Ndb\\_pushed\\_reads](#page-154-3)
+
+The number of rows returned to mysqld from the NDB kernel by joins that were pushed down.
+
+![](_page_154_Picture_22.jpeg)
+
+#### **Note**
+
+Executing EXPLAIN on joins that can be pushed down to NDB does not add to this number.
+
+<span id="page-154-9"></span>• [Ndb\\_pruned\\_scan\\_count](#page-154-9)
+
+This variable holds a count of the number of scans executed by NDBCLUSTER since the NDB Cluster was last started where NDBCLUSTER was able to use partition pruning.
+
+Using this variable together with [Ndb\\_scan\\_count](#page-154-10) can be helpful in schema design to maximize the ability of the server to prune scans to a single table partition, thereby involving only a single data node.
+
+<span id="page-154-10"></span>• [Ndb\\_scan\\_count](#page-154-10)
+
+This variable holds a count of the total number of scans executed by NDBCLUSTER since the NDB Cluster was last started.
+
+<span id="page-154-4"></span>• [Ndb\\_slave\\_max\\_replicated\\_epoch](#page-154-4)
+
+The most recently committed epoch on this replica. You can compare this value with [Ndb\\_conflict\\_last\\_conflict\\_epoch](#page-152-6); if Ndb\_slave\_max\_replicated\_epoch is the greater of the two, no conflicts have yet been detected.
+
+For more information, see Section 21.7.11, "NDB Cluster Replication Conflict Resolution".
+
+<span id="page-155-0"></span>• [Ndb\\_system\\_name](#page-155-0)
+
+If this MySQL Server is connected to an NDB cluster, this read-only variable shows the cluster system name. Otherwise, the value is an empty string.

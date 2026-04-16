@@ -1,0 +1,16 @@
+# Oracle 23c - COVAR_SAMP
+Source: https://docs.oracle.com/en/database/oracle/oracle-database/23/sqlrf/COVAR_SAMP.html
+
+`COVAR_SAMP` returns the sample covariance of a set of number pairs. You can use it as an aggregate or analytic function.
+
+This function takes as arguments any numeric data type or any nonnumeric data type that can be implicitly converted to a numeric data type. The database determines the argument with the highest numeric precedence, implicitly converts the remaining arguments to that data type, and returns that data type.
+
+The database applies the function to the set of (`expr1`, `expr2`) pairs after eliminating all pairs for which either `expr1` or `expr2` is null. Then the database makes the following computation:
+
+```
+(SUM(expr1 * expr2) - SUM(expr1) * SUM(expr2) / n) / (n-1)
+```
+
+where `n` is the number of (`expr1`, `expr2`) pairs where neither `expr1` nor `expr2` is null.
+
+The function returns a value of type `NUMBER`. If the function is applied to an empty set, then it returns null.

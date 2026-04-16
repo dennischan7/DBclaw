@@ -1,0 +1,16 @@
+---
+source: MySQL 8.0 Reference
+title: 00_Overview
+---
+
+During an online upgrade procedure, if the group is in single-primary mode, all the servers that are not currently offline for upgrading function as they did before. The group elects a new primary whenever necessary, following the election policies described in [Section 20.1.3.1, "Single-Primary Mode"](#page-88-1). Note that if you require the primary to remain the same throughout (except when it is being upgraded itself), you must first upgrade all of the secondaries to a version higher than or equal to the target primary member version, then upgrade the primary last. The primary cannot remain as the primary unless it is running the lowest MySQL Server version in the group. After the primary has been upgraded, you can use the group\_replication\_set\_as\_primary() function to reappoint it as the primary.
+
+If the group is in multi-primary mode, fewer online members are available to perform writes during the upgrade procedure, because upgraded members join in read-only mode after their upgrade. From MySQL 8.0.17, this applies to upgrades between patch versions, and for lower releases, this only applies to upgrades between major versions. When all members have been upgraded to the same release, from MySQL 8.0.17, they all change back to read-write mode automatically. For earlier releases, you must set super\_read\_only to OFF manually on each member that should function as a primary following the upgrade.
+
+To deal with a problem situation, for example if you have to roll back an upgrade or add extra capacity to a group in an emergency, it is possible to allow a member to join an online group although it is running a lower MySQL Server version than the lowest version in use by other group members. The Group Replication system variable group\_replication\_allow\_local\_lower\_version\_join can be used in such situations to override the normal compatibility policies.
+
+![](_page_198_Picture_4.jpeg)
+
+#### **Important**
+
+Setting group\_replication\_allow\_local\_lower\_version\_join to ON does not make the new member compatible with the group; doing this allows it to join the group without any safeguards against incompatible behaviors by the existing members. This must therefore only be used carefully in specific situations, and you must take additional precautions to avoid the new member failing due to normal group activity. See the description of this variable for more information.

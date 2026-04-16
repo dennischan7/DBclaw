@@ -1,0 +1,28 @@
+---
+source: MySQL 5.7 Reference
+title: 00_Overview
+---
+
+MySQL 5.7 supports delayed replication such that a replica server deliberately lags behind the source by at least a specified amount of time. The default delay is 0 seconds. Use the MASTER\_DELAY option for CHANGE MASTER TO to set the delay to N seconds:
+
+```
+CHANGE MASTER TO MASTER_DELAY = N;
+```
+
+An event received from the source is not executed until at least N seconds later than its execution on the source. The exceptions are that there is no delay for format description events or log file rotation events, which affect only the internal state of the SQL thread.
+
+Delayed replication can be used for several purposes:
+
+- To protect against user mistakes on the source. A DBA can roll back a delayed replica to the time just before the disaster.
+- To test how the system behaves when there is a lag. For example, in an application, a lag might be caused by a heavy load on the replica. However, it can be difficult to generate this load level. Delayed replication can simulate the lag without having to simulate the load. It can also be used to debug conditions related to a lagging replica.
+- To inspect what the database looked like long ago, without having to reload a backup. For example, if the delay is one week and the DBA needs to see what the database looked like before the last few days' worth of development, the delayed replica can be inspected.
+
+START SLAVE and STOP SLAVE take effect immediately and ignore any delay. RESET SLAVE resets the delay to 0.
+
+SHOW SLAVE STATUS has three fields that provide information about the delay:
+
+- SQL\_Delay: A nonnegative integer indicating the number of seconds that the replica must lag the source.
+- SQL\_Remaining\_Delay: When Slave\_SQL\_Running\_State is Waiting until MASTER\_DELAY seconds after master executed event, this field contains an integer indicating the number of seconds left of the delay. At other times, this field is NULL.
+- Slave\_SQL\_Running\_State: A string indicating the state of the SQL thread (analogous to Slave\_IO\_State). The value is identical to the State value of the SQL thread as displayed by SHOW PROCESSLIST.
+
+When the replication SQL thread is waiting for the delay to elapse before executing an event, SHOW PROCESSLIST displays its State value as Waiting until MASTER\_DELAY seconds after master executed event.

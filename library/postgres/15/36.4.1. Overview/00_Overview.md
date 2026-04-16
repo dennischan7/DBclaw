@@ -1,0 +1,14 @@
+---
+source: PostgreSQL 15 Reference
+title: 00_Overview
+---
+
+Passing data between the C program and the SQL statements is particularly simple in embedded SQL. Instead of having the program paste the data into the statement, which entails various complications, such as properly quoting the value, you can simply write the name of a C variable into the SQL statement, prefixed by a colon. For example:
+
+```
+EXEC SQL INSERT INTO sometable VALUES (:v1, 'foo', :v2);
+```
+
+This statement refers to two C variables named v1 and v2 and also uses a regular SQL string literal, to illustrate that you are not restricted to use one kind of data or the other.
+
+This style of inserting C variables in SQL statements works anywhere a value expression is expected in an SQL statement.

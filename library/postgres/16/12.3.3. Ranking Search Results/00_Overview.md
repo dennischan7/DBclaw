@@ -1,0 +1,102 @@
+---
+source: PostgreSQL 16 Reference
+title: 00_Overview
+---
+
+Ranking attempts to measure how relevant documents are to a particular query, so that when there are many matches the most relevant ones can be shown first. PostgreSQL provides two predefined ranking functions, which take into account lexical, proximity, and structural information; that is, they consider how often the query terms appear in the document, how close together the terms are in the document, and how important is the part of the document where they occur. However, the concept of relevancy is vague and very application-specific. Different applications might require additional information for ranking, e.g., document modification time. The built-in ranking functions are only examples. You can write your own ranking functions and/or combine their results with additional factors to fit your specific needs.
+
+The two ranking functions currently available are:
+
+```
+ts_rank([ weights float4[], ] vector tsvector, query tsquery [,
+normalization integer ]) returns float4
+```
+
+Ranks vectors based on the frequency of their matching lexemes.
+
+```
+ts_rank_cd([ weights float4[], ] vector tsvector, query tsquery [,
+normalization integer ]) returns float4
+```
+
+This function computes the *cover density* ranking for the given document vector and query, as described in Clarke, Cormack, and Tudhope's "Relevance Ranking for One to Three Term Queries" in the journal "Information Processing and Management", 1999. Cover density is similar to ts\_rank ranking except that the proximity of matching lexemes to each other is taken into consideration.
+
+This function requires lexeme positional information to perform its calculation. Therefore, it ignores any "stripped" lexemes in the tsvector. If there are no unstripped lexemes in the input, the result will be zero. (See [Section 12.4.1](#page-94-0) for more information about the strip function and positional information in tsvectors.)
+
+For both these functions, the optional weights argument offers the ability to weigh word instances more or less heavily depending on how they are labeled. The weight arrays specify how heavily to weigh each category of word, in the order:
+
+```
+{D-weight, C-weight, B-weight, A-weight}
+```
+
+If no weights are provided, then these defaults are used:
+
+```
+{0.1, 0.2, 0.4, 1.0}
+```
+
+Typically weights are used to mark words from special areas of the document, like the title or an initial abstract, so they can be treated with more or less importance than words in the document body.
+
+Since a longer document has a greater chance of containing a query term it is reasonable to take into account document size, e.g., a hundred-word document with five instances of a search word is probably more relevant than a thousand-word document with five instances. Both ranking functions take an integer normalization option that specifies whether and how a document's length should impact its rank. The integer option controls several behaviors, so it is a bit mask: you can specify one or more behaviors using | (for example, 2|4).
+
+- 0 (the default) ignores the document length
+- 1 divides the rank by 1 + the logarithm of the document length
+- 2 divides the rank by the document length
+- 4 divides the rank by the mean harmonic distance between extents (this is implemented only by ts\_rank\_cd)
+- 8 divides the rank by the number of unique words in document
+- 16 divides the rank by 1 + the logarithm of the number of unique words in document
+- 32 divides the rank by itself + 1
+
+If more than one flag bit is specified, the transformations are applied in the order listed.
+
+It is important to note that the ranking functions do not use any global information, so it is impossible to produce a fair normalization to 1% or 100% as sometimes desired. Normalization option 32 (rank/ (rank+1)) can be applied to scale all ranks into the range zero to one, but of course this is just a cosmetic change; it will not affect the ordering of the search results.
+
+Here is an example that selects only the ten highest-ranked matches:
+
+```
+SELECT title, ts_rank_cd(textsearch, query) AS rank
+FROM apod, to_tsquery('neutrino|(dark & matter)') query
+WHERE query @@ textsearch
+ORDER BY rank DESC
+LIMIT 10;
+ title | rank
+-----------------------------------------------+----------
+ Neutrinos in the Sun | 3.1
+ The Sudbury Neutrino Detector | 2.4
+ A MACHO View of Galactic Dark Matter | 2.01317
+ Hot Gas and Dark Matter | 1.91171
+ The Virgo Cluster: Hot Plasma and Dark Matter | 1.90953
+ Rafting for Solar Neutrinos | 1.9
+ NGC 4650A: Strange Galaxy and Dark Matter | 1.85774
+ Hot Gas and Dark Matter | 1.6123
+ Ice Fishing for Cosmic Neutrinos | 1.6
+ Weak Lensing Distorts the Universe | 0.818218
+```
+
+This is the same example using normalized ranking:
+
+```
+SELECT title, ts_rank_cd(textsearch, query, 32 /* rank/(rank+1)
+ */ ) AS rank
+FROM apod, to_tsquery('neutrino|(dark & matter)') query
+WHERE query @@ textsearch
+ORDER BY rank DESC
+LIMIT 10;
+ title | rank
+-----------------------------------------------+-------------------
+ Neutrinos in the Sun | 0.756097569485493
+ The Sudbury Neutrino Detector | 0.705882361190954
+```
+
+```
+ A MACHO View of Galactic Dark Matter | 0.668123210574724
+ Hot Gas and Dark Matter | 0.65655958650282
+ The Virgo Cluster: Hot Plasma and Dark Matter | 0.656301290640973
+ Rafting for Solar Neutrinos | 0.655172410958162
+ NGC 4650A: Strange Galaxy and Dark Matter | 0.650072921219637
+ Hot Gas and Dark Matter | 0.617195790024749
+ Ice Fishing for Cosmic Neutrinos | 0.615384618911517
+ Weak Lensing Distorts the Universe | 0.450010798361481
+```
+
+Ranking can be expensive since it requires consulting the tsvector of each matching document, which can be I/O bound and therefore slow. Unfortunately, it is almost impossible to avoid since practical queries often result in large numbers of matches.

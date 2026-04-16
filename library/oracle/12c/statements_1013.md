@@ -1,0 +1,56 @@
+# Oracle 12c - statements_1013
+Source: https://docs.oracle.com/database/121/SQLRF/statements_1013.htm
+
+Prerequisites
+
+The indextype must be in your own schema or you must have the `ALTER` `ANY` `INDEXTYPE` system privilege.
+
+To add a new operator, you must have the `EXECUTE` object privilege on the operator.
+
+To change the implementation type, you must have the `EXECUTE` object privilege on the new implementation type.
+
+Semantics
+
+schema
+
+Specify the name of the schema in which the indextype resides. If you omit `schema`, then Oracle Database assumes the indextype is in your own schema.
+
+indextype
+
+Specify the name of the indextype to be modified.
+
+ADD | DROP
+
+Use the `ADD` or `DROP` clause to add or drop an operator.
+
+No special privilege needed to drop.
+
+* For `schema`, specify the schema containing the operator. If you omit `schema`, then Oracle assumes the operator is in your own schema.
+* For `operator`, specify the name of the operator supported by the indextype.
+
+  All the operators listed in this clause must be valid operators.
+* For `parameter_type`, list the types of parameters to the operator.
+
+using\_type\_clause
+
+The `USING` clause lets you specify a new type to provide the implementation for the indextype.
+
+array\_DML\_clause
+
+Use this clause to modify the indextype to support the array interface for the `ODCIIndexInsert` method.
+
+type and varray\_type If the data type of the column to be indexed is a user-defined object type, then you must specify this clause to identify the varray `varray_type` that Oracle should use to hold column values of `type`. If the indextype supports a list of types, then you can specify a corresponding list of varray types. If you omit `schema` for either `type` or `varray_type`, then Oracle assumes the type is in your own schema.
+
+If the data type of the column to be indexed is a built-in system type, then any varray type specified for the indextype takes precedence over the ODCI types defined by the system.
+
+COMPILE
+
+Use this clause to recompile the indextype explicitly. This clause is required only after some upgrade operations, because Oracle Database normally recompiles the indextype automatically.
+
+storage\_table\_clause
+
+This clause has the same behavior when altering an indextype that it has when you are creating an indextype. Refer to the `CREATE` `INDEXTYPE` [storage\_table\_clause](statements_5014.md#BABEHBBD) for more information.
+
+WITH LOCAL PARTITION
+
+This clause has the same behavior when altering an indextype that it has when you create an indextype. Refer to the `CREATE` `INDEXTYPE` clause [WITH LOCAL PARTITION](statements_5014.md#BABBFIDC) for more information.

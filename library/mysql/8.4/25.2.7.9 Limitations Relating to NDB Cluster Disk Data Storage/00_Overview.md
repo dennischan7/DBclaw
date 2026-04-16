@@ -1,0 +1,131 @@
+---
+source: MySQL 8.4 Reference
+title: 00_Overview
+---
+
+**Disk Data object maximums and minimums.** Disk data objects are subject to the following maximums and minimums:
+
+- Maximum number of tablespaces: 232 (4294967296)
+- Maximum number of data files per tablespace: 216 (65536)
+- The minimum and maximum possible sizes of extents for tablespace data files are 32K and 2G, respectively. See Section 15.1.21, "CREATE TABLESPACE Statement", for more information.
+
+In addition, when working with NDB Disk Data tables, you should be aware of the following issues regarding data files and extents:
+
+- Data files use [DataMemory](#page-156-0). Usage is the same as for in-memory data.
+- Data files use file descriptors. It is important to keep in mind that data files are always open, which means the file descriptors are always in use and cannot be re-used for other system tasks.
+- Extents require sufficient DiskPageBufferMemory; you must reserve enough for this parameter to account for all memory used by all extents (number of extents times size of extents).
+
+**Disk Data tables and diskless mode.** Use of Disk Data tables is not supported when running the cluster in diskless mode.
+
+# <span id="page-80-0"></span>**25.2.7.10 Limitations Relating to Multiple NDB Cluster Nodes**
+
+#### **Multiple SQL nodes.**
+
+The following are issues relating to the use of multiple MySQL servers as NDB Cluster SQL nodes, and are specific to the [NDBCLUSTER](#page-50-0) storage engine:
+
+- **Stored programs not distributed.** Stored procedures, stored functions, triggers, and scheduled events are all supported by tables using the [NDB](#page-50-0) storage engine, but these do not propagate automatically between MySQL Servers acting as Cluster SQL nodes, and must be re-created separately on each SQL node. See Stored routines and triggers in NDB Cluster.
+- **No distributed table locks.** A LOCK TABLES statement or GET\_LOCK() call works only for the SQL node on which the lock is issued; no other SQL node in the cluster "sees" this lock. This is true for a lock issued by any statement that locks tables as part of its operations. (See next item for an example.)
+
+Implementing table locks in NDBCLUSTER can be done in an API application, and ensuring that all applications start by setting [LockMode](https://dev.mysql.com/doc/ndbapi/en/ndb-ndboperation.md#ndb-ndboperation-lockmode) to LM\_Read or LM\_Exclusive. For more information about how to do this, see the description of [NdbOperation::getLockHandle\(\)](https://dev.mysql.com/doc/ndbapi/en/ndb-ndboperation.md#ndb-ndboperation-getlockhandle) in the NDB Cluster API Guide.
+
+• **ALTER TABLE operations.** ALTER TABLE is not fully locking when running multiple MySQL servers (SQL nodes). (As discussed in the previous item, NDB Cluster does not support distributed table locks.)
+
+**Multiple management nodes.** 
+
+When using multiple management servers:
+
+- If any of the management servers are running on the same host, you must give nodes explicit IDs in connection strings because automatic allocation of node IDs does not work across multiple management servers on the same host. This is not required if every management server resides on a different host.
+- When a management server starts, it first checks for any other management server in the same NDB Cluster, and upon successful connection to the other management server uses its configuration data. This means that the management server --reload and --initial startup options are ignored unless the management server is the only one running. It also means that, when performing a rolling restart of an NDB Cluster with multiple management nodes, the management server reads its own configuration file if (and only if) it is the only management server running in this NDB Cluster. See Section 25.6.5, "Performing a Rolling Restart of an NDB Cluster", for more information.
+
+**Multiple network addresses.** Multiple network addresses per data node are not supported. Use of these is liable to cause problems: In the event of a data node failure, an SQL node waits for confirmation that the data node went down but never receives it because another route to that data node remains open. This can effectively make the cluster inoperable.
+
+![](_page_81_Picture_5.jpeg)
+
+#### **Note**
+
+It is possible to use multiple network hardware interfaces (such as Ethernet cards) for a single data node, but these must be bound to the same address. This also means that it not possible to use more than one [tcp] section per connection in the config.ini file. See Section 25.4.3.10, "NDB Cluster TCP/ IP Connections", for more information.
+
+# <span id="page-81-0"></span>**25.3 NDB Cluster Installation**
+
+This section describes the basics for planning, installing, configuring, and running an NDB Cluster. Whereas the examples in [Section 25.4, "Configuration of NDB Cluster"](#page-107-0) provide more in-depth information on a variety of clustering options and configuration, the result of following the guidelines and procedures outlined here should be a usable NDB Cluster which meets the minimum requirements for availability and safeguarding of data.
+
+For information about upgrading or downgrading an NDB Cluster between release versions, see [Section 25.3.7, "Upgrading and Downgrading NDB Cluster".](#page-106-0)
+
+This section covers hardware and software requirements; networking issues; installation of NDB Cluster; basic configuration issues; starting, stopping, and restarting the cluster; loading of a sample database; and performing queries.
+
+**Assumptions.** The following sections make a number of assumptions regarding the cluster's physical and network configuration. These assumptions are discussed in the next few paragraphs.
+
+<span id="page-81-1"></span>**Cluster nodes and host computers.** The cluster consists of four nodes, each on a separate host computer, and each with a fixed network address on a typical Ethernet network as shown here:
+
+**Table 25.4 Network addresses of nodes in example cluster**
+
+| Node                   | IP Address    |
+|------------------------|---------------|
+| Management node (mgmd) | 198.51.100.10 |
+| SQL node (mysqld)      | 198.51.100.20 |
+| Data node "A" (ndbd)   | 198.51.100.30 |
+| Data node "B" (ndbd)   | 198.51.100.40 |
+
+This setup is also shown in the following diagram:
+
+**Figure 25.4 NDB Cluster Multi-Computer Setup**
+
+![](_page_82_Figure_2.jpeg)
+
+**Network addressing.** In the interest of simplicity (and reliability), this How-To uses only numeric IP addresses. However, if DNS resolution is available on your network, it is possible to use host names in lieu of IP addresses in configuring Cluster. Alternatively, you can use the hosts file (typically /etc/ hosts for Linux and other Unix-like operating systems, C:\WINDOWS\system32\drivers\etc \hosts on Windows, or your operating system's equivalent) for providing a means to do host lookup if such is available.
+
+NDB 8.4 supports IPv6 for connections between all NDB Cluster nodes.
+
+**Potential hosts file issues.** A common problem when trying to use host names for Cluster nodes arises because of the way in which some operating systems (including some Linux distributions) set up the system's own host name in the /etc/hosts during installation. Consider two machines with the host names ndb1 and ndb2, both in the cluster network domain. Red Hat Linux (including some derivatives such as CentOS and Fedora) places the following entries in these machines' /etc/hosts files:
+
+```
+# ndb1 /etc/hosts:
+127.0.0.1 ndb1.cluster ndb1 localhost.localdomain localhost
+# ndb2 /etc/hosts:
+127.0.0.1 ndb2.cluster ndb2 localhost.localdomain localhost
+```
+
+SUSE Linux (including OpenSUSE) places these entries in the machines' /etc/hosts files:
+
+```
+# ndb1 /etc/hosts:
+127.0.0.1 localhost
+127.0.0.2 ndb1.cluster ndb1
+# ndb2 /etc/hosts:
+127.0.0.1 localhost
+127.0.0.2 ndb2.cluster ndb2
+```
+
+In both instances, ndb1 routes ndb1.cluster to a loopback IP address, but gets a public IP address from DNS for ndb2.cluster, while ndb2 routes ndb2.cluster to a loopback address and obtains a public address for ndb1.cluster. The result is that each data node connects to the management server, but cannot tell when any other data nodes have connected, and so the data nodes appear to hang while starting.
+
+![](_page_83_Picture_1.jpeg)
+
+#### **Caution**
+
+You cannot mix localhost and other host names or IP addresses in config.ini. For these reasons, the solution in such cases (other than to use IP addresses for all config.ini HostName entries) is to remove the fully qualified host names from /etc/hosts and use these in config.ini for all cluster hosts.
+
+**Host computer type.** Each host computer in our installation scenario is an Intel-based desktop PC running a supported operating system installed to disk in a standard configuration, and running no unnecessary services. The core operating system with standard TCP/IP networking capabilities should be sufficient. Also for the sake of simplicity, we also assume that the file systems on all hosts are set up identically. In the event that they are not, you should adapt these instructions accordingly.
+
+**Network hardware.** Standard 100 Mbps or 1 gigabit Ethernet cards are installed on each machine, along with the proper drivers for the cards, and that all four hosts are connected through a standardissue Ethernet networking appliance such as a switch. (All machines should use network cards with the same throughput. That is, all four machines in the cluster should have 100 Mbps cards or all four machines should have 1 Gbps cards.) NDB Cluster works in a 100 Mbps network; however, gigabit Ethernet provides better performance.
+
+![](_page_83_Picture_6.jpeg)
+
+### **Important**
+
+NDB Cluster is not intended for use in a network for which throughput is less than 100 Mbps or which experiences a high degree of latency. For this reason (among others), attempting to run an NDB Cluster over a wide area network such as the Internet is not likely to be successful, and is not supported in production.
+
+**Sample data.** We use the world database which is available for download from the MySQL website (see [https://dev.mysql.com/doc/index-other.html\)](https://dev.mysql.com/doc/index-other.md). We assume that each machine has sufficient memory for running the operating system, required NDB Cluster processes, and (on the data nodes) storing the database.
+
+For general information about installing MySQL, see Chapter 2, Installing MySQL. For information about installation of NDB Cluster on Linux and other Unix-like operating systems, see [Section 25.3.1,](#page-83-0) ["Installation of NDB Cluster on Linux"](#page-83-0). For information about installation of NDB Cluster on Windows operating systems, see [Section 25.3.2, "Installing NDB Cluster on Windows".](#page-91-0)
+
+For general information about NDB Cluster hardware, software, and networking requirements, see [Section 25.2.3, "NDB Cluster Hardware, Software, and Networking Requirements".](#page-61-0)
+
+# <span id="page-83-0"></span>**25.3.1 Installation of NDB Cluster on Linux**
+
+This section covers installation methods for NDB Cluster on Linux and other Unix-like operating systems. While the next few sections refer to a Linux operating system, the instructions and procedures given there should be easily adaptable to other supported Unix-like platforms. For manual installation and setup instructions specific to Windows systems, see [Section 25.3.2, "Installing NDB Cluster on](#page-91-0) [Windows".](#page-91-0)
+
+Each NDB Cluster host computer must have the correct executable programs installed. A host running an SQL node must have installed on it a MySQL Server binary (mysqld). Management nodes require the management server daemon (ndb\_mgmd); data nodes require the data node daemon (ndbd or ndbmtd). It is not necessary to install the MySQL Server binary on management node hosts and data node hosts. It is recommended that you also install the management client (ndb\_mgm) on the management server host.
+
+Installation of NDB Cluster on Linux can be done using precompiled binaries from Oracle (downloaded as a .tar.gz archive), with RPM packages (also available from Oracle), or from source code. All three of these installation methods are described in the section that follow.
+
+Regardless of the method used, it is still necessary following installation of the NDB Cluster binaries to create configuration files for all cluster nodes, before you can start the cluster. See [Section 25.3.3,](#page-100-0) ["Initial Configuration of NDB Cluster".](#page-100-0)

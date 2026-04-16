@@ -1,0 +1,361 @@
+---
+source: MySQL 8.0 Reference
+title: 00_Overview
+---
+
+![](_page_128_Picture_4.jpeg)
+
+### **Important**
+
+The InnoDB memcached plugin was removed in MySQL 8.3.0, and was deprecated in MySQL 8.0.22.
+
+The InnoDB memcached plugin (daemon\_memcached) provides an integrated memcached daemon that automatically stores and retrieves data from InnoDB tables, turning the MySQL server into a fast "key-value store". Instead of formulating queries in SQL, you can use simple get, set, and incr operations that avoid the performance overhead associated with SQL parsing and constructing a query optimization plan. You can also access the same InnoDB tables through SQL for convenience, complex queries, bulk operations, and other strengths of traditional database software.
+
+This "NoSQL-style" interface uses the memcached API to speed up database operations, letting InnoDB handle memory caching using its buffer pool mechanism. Data modified through memcached operations such as add, set, and incr are stored to disk, in InnoDB tables. The combination of memcached simplicity and InnoDB reliability and consistency provides users with the best of both worlds, as explained in [Section 17.20.1, "Benefits of the InnoDB memcached Plugin".](#page-128-0) For an architectural overview, see [Section 17.20.2, "InnoDB memcached Architecture".](#page-129-0)
+
+## <span id="page-128-0"></span>**17.20.1 Benefits of the InnoDB memcached Plugin**
+
+This section outlines advantages the daemon\_memcached plugin. The combination of InnoDB tables and memcached offers advantages over using either by themselves.
+
+- Direct access to the InnoDB storage engine avoids the parsing and planning overhead of SQL.
+- Running memcached in the same process space as the MySQL server avoids the network overhead of passing requests back and forth.
+- Data written using the memcached protocol is transparently written to an InnoDB table, without going through the MySQL SQL layer. You can control frequency of writes to achieve higher raw performance when updating non-critical data.
+- Data requested through the memcached protocol is transparently queried from an InnoDB table, without going through the MySQL SQL layer.
+- Subsequent requests for the same data is served from the InnoDB buffer pool. The buffer pool handles the in-memory caching. You can tune performance of data-intensive operations using InnoDB configuration options.
+- Data can be unstructured or structured, depending on the type of application. You can create a new table for data, or use existing tables.
+- InnoDB can handle composing and decomposing multiple column values into a single memcached item value, reducing the amount of string parsing and concatenation required in your application. For example, you can store the string value 2|4|6|8 in the memcached cache, and have InnoDB split the value based on a separator character, then store the result in four numeric columns.
+- The transfer between memory and disk is handled automatically, simplifying application logic.
+
+- Data is stored in a MySQL database to protect against crashes, outages, and corruption.
+- You can access the underlying InnoDB table through SQL for reporting, analysis, ad hoc queries, bulk loading, multi-step transactional computations, set operations such as union and intersection, and other operations suited to the expressiveness and flexibility of SQL.
+- You can ensure high availability by using the daemon\_memcached plugin on a source server in combination with MySQL replication.
+- The integration of memcached with MySQL provides a way to make in-memory data persistent, so you can use it for more significant kinds of data. You can use more add, incr, and similar write operations in your application without concern that data could be lost. You can stop and start the memcached server without losing updates made to cached data. To guard against unexpected outages, you can take advantage of InnoDB crash recovery, replication, and backup capabilities.
+- The way InnoDB does fast primary key lookups is a natural fit for memcached single-item queries. The direct, low-level database access path used by the daemon\_memcached plugin is much more efficient for key-value lookups than equivalent SQL queries.
+- The serialization features of memcached, which can turn complex data structures, binary files, or even code blocks into storable strings, offer a simple way to get such objects into a database.
+- Because you can access the underlying data through SQL, you can produce reports, search or update across multiple keys, and call functions such as AVG() and MAX() on memcached data. All of these operations are expensive or complicated using memcached by itself.
+- You do not need to manually load data into memcached at startup. As particular keys are requested by an application, values are retrieved from the database automatically, and cached in memory using the InnoDB buffer pool.
+- Because memcached consumes relatively little CPU, and its memory footprint is easy to control, it can run comfortably alongside a MySQL instance on the same system.
+- Because data consistency is enforced by mechanisms used for regular InnoDB tables, you do not have to worry about stale memcached data or fallback logic to query the database in the case of a missing key.
+
+## <span id="page-129-0"></span>**17.20.2 InnoDB memcached Architecture**
+
+The InnoDB memcached plugin implements memcached as a MySQL plugin daemon that accesses the InnoDB storage engine directly, bypassing the MySQL SQL layer.
+
+The following diagram illustrates how an application accesses data through the daemon\_memcached plugin, compared with SQL.
+
+![](_page_130_Figure_1.jpeg)
+
+**Figure 17.4 MySQL Server with Integrated memcached Server**
+
+Features of the daemon\_memcached plugin:
+
+- memcached as a daemon plugin of mysqld. Both mysqld and memcached run in the same process space, with very low latency access to data.
+- Direct access to InnoDB tables, bypassing the SQL parser, the optimizer, and even the Handler API layer.
+- Standard memcached protocols, including the text-based protocol and the binary protocol. The daemon\_memcached plugin passes all 55 compatibility tests of the memcapable command.
+- Multi-column support. You can map multiple columns into the "value" part of the key-value store, with column values delimited by a user-specified separator character.
+- By default, the memcached protocol is used to read and write data directly to InnoDB, letting MySQL manage in-memory caching using the InnoDB buffer pool. The default settings represent a combination of high reliability and the fewest surprises for database applications. For example, default settings avoid uncommitted data on the database side, or stale data returned for memcached get requests.
+- Advanced users can configure the system as a traditional memcached server, with all data cached only in the memcached engine (memory caching), or use a combination of the "memcached engine" (memory caching) and the InnoDB memcached engine (InnoDB as back-end persistent storage).
+- Control over how often data is passed back and forth between InnoDB and memcached operations through the [innodb\\_api\\_bk\\_commit\\_interval](#page-0-0), daemon\_memcached\_r\_batch\_size, and daemon\_memcached\_w\_batch\_size configuration options. Batch size options default to a value of 1 for maximum reliability.
+- The ability to specify memcached options through the daemon\_memcached\_option configuration parameter. For example, you can change the port that memcached listens on, reduce the maximum number of simultaneous connections, change the maximum memory size for a key-value pair, or enable debugging messages for the error log.
+
+- The [innodb\\_api\\_trx\\_level](#page-1-2) configuration option controls the transaction isolation level on queries processed by memcached. Although memcached has no concept of transactions, you can use this option to control how soon memcached sees changes caused by SQL statements issued on the table used by the daemon\_memcached plugin. By default, [innodb\\_api\\_trx\\_level](#page-1-2) is set to READ UNCOMMITTED.
+- The [innodb\\_api\\_enable\\_mdl](#page-1-1) option can be used to lock the table at the MySQL level, so that the mapped table cannot be dropped or altered by DDL through the SQL interface. Without the lock, the table can be dropped from the MySQL layer, but kept in InnoDB storage until memcached or some other user stops using it. "MDL" stands for "metadata locking".
+
+## <span id="page-131-0"></span>**17.20.3 Setting Up the InnoDB memcached Plugin**
+
+This section describes how to set up the daemon\_memcached plugin on a MySQL server. Because the memcached daemon is tightly integrated with the MySQL server to avoid network traffic and minimize latency, you perform this process on each MySQL instance that uses this feature.
+
+![](_page_131_Picture_5.jpeg)
+
+#### **Note**
+
+Before setting up the daemon\_memcached plugin, consult [Section 17.20.5,](#page-138-0) ["Security Considerations for the InnoDB memcached Plugin"](#page-138-0) to understand the security procedures required to prevent unauthorized access.
+
+## **Prerequisites**
+
+- The daemon\_memcached plugin is only supported on Linux, Solaris, and macOS platforms. Other operating systems are not supported.
+- When building MySQL from source, you must build with -DWITH\_INNODB\_MEMCACHED=ON. This build option generates two shared libraries in the MySQL plugin directory (plugin\_dir) that are required to run the daemon\_memcached plugin:
+  - libmemcached.so: the memcached daemon plugin to MySQL.
+  - innodb\_engine.so: an InnoDB API plugin to memcached.
+- libevent must be installed.
+  - If you did not build MySQL from source, the libevent library is not included in your installation. Use the installation method for your operating system to install libevent 1.4.12 or later. For example, depending on the operating system, you might use apt-get, yum, or port install. For example, on Ubuntu Linux, use:
+
+```
+sudo apt-get install libevent-dev
+```
+
+• If you installed MySQL from a source code release, libevent 1.4.12 is bundled with the package and is located at the top level of the MySQL source code directory. If you use the bundled version of libevent, no action is required. If you want to use a local system version of libevent, you must build MySQL with the -DWITH\_LIBEVENT build option set to system or yes.
+
+## **Installing and Configuring the InnoDB memcached Plugin**
+
+1. Configure the daemon\_memcached plugin so it can interact with InnoDB tables by running the innodb\_memcached\_config.sql configuration script, which is located in MYSQL\_HOME/share. This script installs the innodb\_memcache database with three required tables (cache\_policies, config\_options, and containers). It also installs the demo\_test sample table in the test database.
+
+```
+mysql> source MYSQL_HOME/share/innodb_memcached_config.sql
+```
+
+Running the innodb\_memcached\_config.sql script is a one-time operation. The tables remain in place if you later uninstall and re-install the daemon\_memcached plugin.
+
+```
+mysql> USE innodb_memcache;
+mysql> SHOW TABLES;
++---------------------------+
+| Tables_in_innodb_memcache |
++---------------------------+
+| cache_policies |
+| config_options |
+| containers |
++---------------------------+
+mysql> USE test;
+mysql> SHOW TABLES;
++----------------+
+| Tables_in_test |
++----------------+
+| demo_test |
++----------------+
+```
+
+Of these tables, the innodb\_memcache.containers table is the most important. Entries in the containers table provide a mapping to InnoDB table columns. Each InnoDB table used with the daemon\_memcached plugin requires an entry in the containers table.
+
+The innodb\_memcached\_config.sql script inserts a single entry in the containers table that provides a mapping for the demo\_test table. It also inserts a single row of data into the demo\_test table. This data allows you to immediately verify the installation after the setup is completed.
+
+```
+mysql> SELECT * FROM innodb_memcache.containers\G
+*************************** 1. row ***************************
+ name: aaa
+ db_schema: test
+ db_table: demo_test
+ key_columns: c1
+ value_columns: c2
+ flags: c3
+ cas_column: c4
+ expire_time_column: c5
+unique_idx_name_on_key: PRIMARY
+mysql> SELECT * FROM test.demo_test;
++----+------------------+------+------+------+
+| c1 | c2 | c3 | c4 | c5 |
++----+------------------+------+------+------+
+| AA | HELLO, HELLO | 8 | 0 | 0 |
++----+------------------+------+------+------+
+```
+
+For more information about innodb\_memcache tables and the demo\_test sample table, see [Section 17.20.8, "InnoDB memcached Plugin Internals"](#page-155-0).
+
+2. Activate the daemon\_memcached plugin by running the INSTALL PLUGIN statement:
+
+```
+mysql> INSTALL PLUGIN daemon_memcached soname "libmemcached.so";
+```
+
+Once the plugin is installed, it is automatically activated each time the MySQL server is restarted.
+
+## **Verifying the InnoDB and memcached Setup**
+
+To verify the daemon\_memcached plugin setup, use a telnet session to issue memcached commands. By default, the memcached daemon listens on port 11211.
+
+1. Retrieve data from the test.demo\_test table. The single row of data in the demo\_test table has a key value of AA.
+
+```
+telnet localhost 11211
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is '^]'.
+```
+
+```
+get AA
+VALUE AA 8 12
+HELLO, HELLO
+END
+```
+
+2. Insert data using a set command.
+
+```
+set BB 10 0 16
+GOODBYE, GOODBYE
+STORED
+```
+
+#### where:
+
+- set is the command to store a value
+- BB is the key
+- 10 is a flag for the operation; ignored by memcached but may be used by the client to indicate any type of information; specify 0 if unused
+- 0 is the expiration time (TTL); specify 0 if unused
+- 16 is the length of the supplied value block in bytes
+- GOODBYE, GOODBYE is the value that is stored
+- 3. Verify that the data inserted is stored in MySQL by connecting to the MySQL server and querying the test.demo\_test table.
+
+```
+mysql> SELECT * FROM test.demo_test;
++----+------------------+------+------+------+
+| c1 | c2 | c3 | c4 | c5 |
++----+------------------+------+------+------+
+| AA | HELLO, HELLO | 8 | 0 | 0 |
+| BB | GOODBYE, GOODBYE | 10 | 1 | 0 |
++----+------------------+------+------+------+
+```
+
+4. Return to the telnet session and retrieve the data that you inserted earlier using key BB.
+
+```
+get BB
+VALUE BB 10 16
+GOODBYE, GOODBYE
+END
+quit
+```
+
+If you shut down the MySQL server, which also shuts off the integrated memcached server, further attempts to access the memcached data fail with a connection error. Normally, the memcached data also disappears at this point, and you would require application logic to load the data back into memory when memcached is restarted. However, the InnoDB memcached plugin automates this process for you.
+
+When you restart MySQL, get operations once again return the key-value pairs you stored in the earlier memcached session. When a key is requested and the associated value is not already in the memory cache, the value is automatically queried from the MySQL test.demo\_test table.
+
+## <span id="page-133-0"></span>**Creating a New Table and Column Mapping**
+
+This example shows how to setup your own InnoDB table with the daemon\_memcached plugin.
+
+1. Create an InnoDB table. The table must have a key column with a unique index. The key column of the city table is city\_id, which is defined as the primary key. The table must also include columns for flags, cas, and expiry values. There may be one or more value columns. The city table has three value columns (name, state, country).
+
+![](_page_134_Picture_1.jpeg)
+
+#### **Note**
+
+There is no special requirement with respect to column names as along as a valid mapping is added to the innodb\_memcache.containers table.
+
+```
+mysql> CREATE TABLE city (
+ city_id VARCHAR(32),
+ name VARCHAR(1024),
+ state VARCHAR(1024),
+ country VARCHAR(1024),
+ flags INT,
+ cas BIGINT UNSIGNED, 
+ expiry INT,
+ primary key(city_id)
+ ) ENGINE=InnoDB;
+```
+
+2. Add an entry to the innodb\_memcache.containers table so that the daemon\_memcached plugin knows how to access the InnoDB table. The entry must satisfy the innodb\_memcache.containers table definition. For a description of each field, see [Section 17.20.8, "InnoDB memcached Plugin Internals"](#page-155-0).
+
+```
+mysql> DESCRIBE innodb_memcache.containers;
++------------------------+--------------+------+-----+---------+-------+
+| Field | Type | Null | Key | Default | Extra |
++------------------------+--------------+------+-----+---------+-------+
+| name | varchar(50) | NO | PRI | NULL | |
+| db_schema | varchar(250) | NO | | NULL | |
+| db_table | varchar(250) | NO | | NULL | |
+| key_columns | varchar(250) | NO | | NULL | |
+| value_columns | varchar(250) | YES | | NULL | |
+| flags | varchar(250) | NO | | 0 | |
+| cas_column | varchar(250) | YES | | NULL | |
+| expire_time_column | varchar(250) | YES | | NULL | |
+| unique_idx_name_on_key | varchar(250) | NO | | NULL | |
++------------------------+--------------+------+-----+---------+-------+
+```
+
+The innodb\_memcache.containers table entry for the city table is defined as:
+
+```
+mysql> INSERT INTO `innodb_memcache`.`containers` (
+ `name`, `db_schema`, `db_table`, `key_columns`, `value_columns`,
+ `flags`, `cas_column`, `expire_time_column`, `unique_idx_name_on_key`)
+ VALUES ('default', 'test', 'city', 'city_id', 'name|state|country', 
+ 'flags','cas','expiry','PRIMARY');
+```
+
+- default is specified for the containers.name column to configure the city table as the default InnoDB table to be used with the daemon\_memcached plugin.
+- Multiple InnoDB table columns (name, state, country) are mapped to containers.value\_columns using a "|" delimiter.
+- The flags, cas\_column, and expire\_time\_column fields of the innodb\_memcache.containers table are typically not significant in applications using the daemon\_memcached plugin. However, a designated InnoDB table column is required for each. When inserting data, specify 0 for these columns if they are unused.
+- 3. After updating the innodb\_memcache.containers table, restart the daemon\_memcache plugin to apply the changes.
+
+```
+mysql> UNINSTALL PLUGIN daemon_memcached;
+mysql> INSTALL PLUGIN daemon_memcached soname "libmemcached.so";
+```
+
+4. Using telnet, insert data into the city table using a memcached set command.
+
+```
+telnet localhost 11211
+Trying 127.0.0.1...
+```
+
+```
+Connected to localhost.
+Escape character is '^]'.
+set B 0 0 22
+BANGALORE|BANGALORE|IN
+STORED
+```
+
+5. Using MySQL, query the test.city table to verify that the data you inserted was stored.
+
+```
+mysql> SELECT * FROM test.city;
++---------+-----------+-----------+---------+-------+------+--------+
+| city_id | name | state | country | flags | cas | expiry |
++---------+-----------+-----------+---------+-------+------+--------+
+| B | BANGALORE | BANGALORE | IN | 0 | 3 | 0 |
++---------+-----------+-----------+---------+-------+------+--------+
+```
+
+6. Using MySQL, insert additional data into the test.city table.
+
+```
+mysql> INSERT INTO city VALUES ('C','CHENNAI','TAMIL NADU','IN', 0, 0 ,0);
+mysql> INSERT INTO city VALUES ('D','DELHI','DELHI','IN', 0, 0, 0);
+mysql> INSERT INTO city VALUES ('H','HYDERABAD','TELANGANA','IN', 0, 0, 0);
+mysql> INSERT INTO city VALUES ('M','MUMBAI','MAHARASHTRA','IN', 0, 0, 0);
+```
+
+![](_page_135_Picture_6.jpeg)
+
+#### **Note**
+
+It is recommended that you specify a value of 0 for the flags, cas\_column, and expire\_time\_column fields if they are unused.
+
+7. Using telnet, issue a memcached get command to retrieve data you inserted using MySQL.
+
+```
+get H
+VALUE H 0 22
+HYDERABAD|TELANGANA|IN
+END
+```
+
+## **Configuring the InnoDB memcached Plugin**
+
+Traditional memcached configuration options may be specified in a MySQL configuration file or a mysqld startup string, encoded in the argument of the daemon\_memcached\_option configuration parameter. memcached configuration options take effect when the plugin is loaded, which occurs each time the MySQL server is started.
+
+For example, to make memcached listen on port 11222 instead of the default port 11211, specify p11222 as an argument of the daemon\_memcached\_option configuration option:
+
+```
+mysqld .... --daemon_memcached_option="-p11222"
+```
+
+Other memcached options can be encoded in the daemon\_memcached\_option string. For example, you can specify options to reduce the maximum number of simultaneous connections, change the maximum memory size for a key-value pair, or enable debugging messages for the error log, and so on.
+
+There are also configuration options specific to the daemon\_memcached plugin. These include:
+
+- daemon\_memcached\_engine\_lib\_name: Specifies the shared library that implements the InnoDB memcached plugin. The default setting is innodb\_engine.so.
+- daemon\_memcached\_engine\_lib\_path: The path of the directory containing the shared library that implements the InnoDB memcached plugin. The default is NULL, representing the plugin directory.
+- daemon\_memcached\_r\_batch\_size: Defines the batch commit size for read operations (get). It specifies the number of memcached read operations after which a commit occurs. daemon\_memcached\_r\_batch\_size is set to 1 by default so that every get request accesses the most recently committed data in the InnoDB table, whether the data was updated through memcached or by SQL. When the value is greater than 1, the counter for read operations is incremented with each get call. A flush\_all call resets both read and write counters.
+
+• daemon\_memcached\_w\_batch\_size: Defines the batch commit size for write operations (set, replace, append, prepend, incr, decr, and so on). daemon\_memcached\_w\_batch\_size is set to 1 by default so that no uncommitted data is lost in case of an outage, and so that SQL queries on the underlying table access the most recent data. When the value is greater than 1, the counter for write operations is incremented for each add, set, incr, decr, and delete call. A flush\_all call resets both read and write counters.
+
+By default, you do not need to modify daemon\_memcached\_engine\_lib\_name or daemon\_memcached\_engine\_lib\_path. You might configure these options if, for example, you want to use a different storage engine for memcached (such as the NDB memcached engine).
+
+daemon\_memcached plugin configuration parameters may be specified in the MySQL configuration file or in a mysqld startup string. They take effect when you load the daemon\_memcached plugin.
+
+When making changes to daemon\_memcached plugin configuration, reload the plugin to apply the changes. To do so, issue the following statements:
+
+```
+mysql> UNINSTALL PLUGIN daemon_memcached;
+mysql> INSTALL PLUGIN daemon_memcached soname "libmemcached.so";
+```
+
+Configuration settings, required tables, and data are preserved when the plugin is restarted.
+
+For additional information about enabling and disabling plugins, see Section 7.6.1, "Installing and Uninstalling Plugins".

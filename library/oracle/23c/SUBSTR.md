@@ -1,0 +1,7 @@
+# Oracle 23c - SUBSTR
+Source: https://docs.oracle.com/en/database/oracle/oracle-database/23/sqlrf/SUBSTR.html
+
+[Previous](STDDEV_SAMP.md)
+[Next](SUM.md)
+
+JavaScript must be enabled to correctly display this content

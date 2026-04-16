@@ -1,0 +1,293 @@
+# Oracle 12c - statements_5001
+Source: https://docs.oracle.com/database/121/SQLRF/statements_5001.htm
+
+Semantics
+
+policy
+
+Specify the name of the unified audit policy to be created. The name must satisfy the requirements listed in ["Database Object Naming Rules"](sql_elements008.md#i27570). You can find the names of all unified audit policies by querying the `AUDIT_UNIFIED_POLICIES` view.
+
+privilege\_audit\_clause
+
+Use this clause to audit one or more system privileges. SQL statements that require the system privilege(s) in order to succeed are audited. For `system_privilege`, specify a valid system privilege. To view all valid system privileges, query the `NAME` column of the `SYSTEM_PRIVILEGE_MAP` view.
+
+Restriction on Auditing System Privileges You cannot audit the following system privileges: `INHERIT` `ANY` `PRIVILEGES`, `SYSASM`, `SYSBACKUP`, `SYSDBA`, `SYSDG`, `SYSKM`, `SYSOPER`, and `TRANSLATE` `ANY` `SQL`.
+
+action\_audit\_clause
+
+Use this clause to specify one or more actions to be audited. Use the `standard_actions` clause to audit actions on standard RDBMS objects and to audit standard RDBMS system actions for the database. Use the `component_actions` clause to audit actions for components.
+
+standard\_actions
+
+Use this clause to audit actions on standard RDBMS objects and to audit standard RDBMS system actions for the database.
+
+object\_action ON Use this clause to audit an action on the specified object. For `object_action`, specify the action to be audited. [Table 14-1](#BGEGGCBI) lists the actions that can be audited on each type of object.
+
+ALL ON Use this clause to audit all actions on the specified object. All of the actions listed in [Table 14-1](#BGEGGCBI) for the type of object that you specify in the `ON` clause will be audited.
+
+ON Clause Use the `ON` clause to specify the object to be audited. Directories and data mining models are identified separately because they reside in separate namespaces. To audit actions on a directory, specify `ON` `DIRECTORY` `directory_name`. To audit actions on a data mining model, specify `ON` `MINING` `MODEL` `object_name`. To audit actions on the other types of objects listed in [Table 14-1](#BGEGGCBI), specify `ON` `object_name`. If you do not qualify `object_name` with `schema`, then the database assumes the object is in your own schema.
+
+Table 14-1 Unified Auditing Objects and Actions
+
+| Type of Object | Actions |
+| --- | --- |
+| Directory | `AUDIT`, `GRANT`, `READ` |
+| Function | `AUDIT`, `EXECUTE` (Notes 1 and 2), `GRANT` |
+| Java Schema Objects (Source, Class, Resource) | `AUDIT`, `EXECUTE`, `GRANT` |
+| Library | `EXECUTE`, `GRANT` |
+| Materialized Views | `ALTER`, `AUDIT`, `COMMENT`, `DELETE`, `INDEX`, `INSERT`, `LOCK`, `SELECT`, `UPDATE` |
+| Mining Model | `AUDIT`, `COMMENT`, `GRANT`, `RENAME`, `SELECT` |
+| Object Type | `ALTER`, `AUDIT`, `GRANT` |
+| Package | `AUDIT`, `EXECUTE`, `GRANT` |
+| Procedure | `AUDIT`, `EXECUTE` (Notes 1 and 2), `GRANT` |
+| Sequence | `ALTER`, `AUDIT`, `GRANT`, `SELECT` |
+| Table | `ALTER`, `AUDIT`, `COMMENT`, `DELETE`, `FLASHBACK`, `GRANT`, `INDEX`, `INSERT`, `LOCK`, `RENAME`, `SELECT`, `UPDATE` |
+| View | `AUDIT`, `DELETE`, `FLASHBACK`, `GRANT`, `INSERT`, `LOCK`, `RENAME`, `SELECT`, `UPDATE` |
+
+Note 1: When you audit the `EXECUTE` operation on a PL/SQL stored procedure or stored function, the database considers only its ability to find the procedure or function and authorize its execution when determining the success or failure of the operation for the purposes of auditing. Therefore, if you specify the `WHENEVER` `NOT` `SUCCESSFUL` clause, then only invalid object errors, non-existent object errors, and authorization failures are audited; errors encountered during the execution of the procedure or function are not audited. If you specify the `WHENEVER` `SUCCESSFUL` clause, then all executions that are not blocked by invalid object errors, non-existent object errors, or authorization failures are audited, regardless of whether errors are encountered during execution.
+
+Note 2: To audit the failure of a recursive SQL operation inside a PL/SQL stored procedure or stored function, configure auditing for the SQL operation.
+
+system\_action Use this clause to audit a system action for the database. To view the valid values for `system_action`, query the `NAME` column of the `AUDITABLE_SYSTEM_ACTIONS` view where `COMPONENT` is '`Standard`'.
+
+ALL Use this clause to audit all system actions for the database.
+
+component\_actions
+
+Use this clause to audit actions for the following components: Oracle Data Pump, Oracle SQL\*Loader Direct Path Load, Oracle Label Security, Oracle Database Real Application Security, and Oracle Database Vault.
+
+DATAPUMP Use this clause to audit actions for Oracle Data Pump. For `component_action`, specify the action to be audited. To view the valid actions for Oracle Data Pump, query the `NAME` column of the `AUDITABLE_SYSTEM_ACTIONS` view where `COMPONENT` is `Datapump`. For example:
+
+```
+SELECT name FROM auditable_system_actions WHERE component = 'Datapump';
+```
+
+Refer to [Oracle Database Security Guide](../DBSEG/audit_config.md#DBSEG928) for complete information on auditing Oracle Data Pump.
+
+DIRECT\_LOAD Use this clause to audit actions for Oracle SQL\*Loader Direct Path Load. For `component_action`, specify the action to be audited. To view the valid actions for Oracle SQL\*Loader Direct Path Load, query the `NAME` column of the `AUDITABLE_SYSTEM_ACTIONS` view where `COMPONENT` is `Direct` `path` `API`. For example:
+
+```
+SELECT name FROM auditable_system_actions WHERE component = 'Direct path API';
+```
+
+Refer to [Oracle Database Security Guide](../DBSEG/audit_config.md#DBSEG120) for complete information on auditing Oracle SQL\*Loader Direct Path Load.
+
+OLS Use this clause to audit actions for Oracle Label Security. For `component_action`, specify the action to be audited. To view the valid actions for Oracle Label Security, query the `NAME` column of the `AUDITABLE_SYSTEM_ACTIONS` view where `COMPONENT` is `Label` `Security`. For example:
+
+```
+SELECT name FROM auditable_system_actions WHERE component = 'Label Security';
+```
+
+Refer to [Oracle Database Security Guide](../DBSEG/audit_config.md#DBSEG454) for complete information on auditing Oracle Label Security.
+
+XS Use this clause to audit actions for Oracle Database Real Application Security. For `component_action`, specify the action to be audited. To view the valid actions for Oracle Database Real Application Security, query the `NAME` column of the `AUDITABLE_SYSTEM_ACTIONS` view where `COMPONENT` is `XS`. For example:
+
+```
+SELECT name FROM auditable_system_actions WHERE component = 'XS';
+```
+
+Refer to [Oracle Database Security Guide](../DBSEG/audit_config.md#DBSEG367) for complete information on auditing Oracle Database Real Application Security.
+
+DV Use this clause to audit actions for Oracle Database Vault. For `component_action`, specify the action to be audited. To view the valid actions for Oracle Database Vault, query the `NAME` column of the `AUDITABLE_SYSTEM_ACTIONS` view where `COMPONENT` is `Database` `Vault`. For example:
+
+```
+SELECT name FROM auditable_system_actions WHERE component = 'Database Vault';
+```
+
+For `object_name`, specify the name of the Database Vault object to be audited.
+
+Refer to [Oracle Database Security Guide](../DBSEG/audit_config.md#DBSEG419) for complete information on auditing Oracle Database Vault.
+
+role\_audit\_clause
+
+Use this clause to specify one or more roles to be audited. When you audit a role, Oracle Database audits all system privileges that are granted directly to the role. SQL statements that require the system privileges in order to succeed are audited. For `role`, specify either a user-defined (local or external) or predefined role. For a list of predefined roles, refer to [Oracle Database Security Guide](../DBSEG/authorization.md#DBSEG4414).
+
+WHEN Clause
+
+Use this clause to control when the unified audit policy is enforced.
+
+audit\_condition Specify a condition that determines if the unified audit policy is enforced. If `audit_condition` evaluates to `TRUE`, then the policy is enforced. If `FALSE`, then the policy is not enforced.
+
+The `audit_condition` can have a maximum length of 4000 characters. It can contain expressions, as well as the following functions and conditions:
+
+* Numeric functions: `BITAND`, `CEIL`, `FLOOR`, `POWER`
+* Character functions returning character values: `CONCAT`, `LOWER`, `UPPER`
+* Character functions returning number values: `INSTR`, `LENGTH`
+* Environment and identifier functions: `SYS_CONTEXT`, `UID`
+* Comparison conditions: `=`, `!=`, `<>`, `<`, `>`, `<=`, `>=`
+* Logical conditions: `AND`, `OR`
+* Null conditions: `IS` `[NOT]` `NULL`
+* `[NOT]` `BETWEEN` condition
+* `[NOT]` `IN` condition
+
+The `audit_condition` must be enclosed in single quotation marks. If the `audit_condition` contains a single quotation mark, then specify two single quotation marks instead. For example, to specify the following condition:
+
+```
+SYS_CONTEXT('USERENV', 'CLIENT_IDENTIFIER') = 'myclient'
+```
+
+Specify the following for `'``audit_condition``'`:
+
+```
+'SYS_CONTEXT(''USERENV'', ''CLIENT_IDENTIFIER'') = ''myclient'''
+```
+
+EVALUATE PER STATEMENT Specify this clause to evaluate the `audit_condition` for each auditable statement. If the `audit_condition` evaluates to `TRUE`, then the unified audit policy is enforced for the statement. If `FALSE`, then the unified audit policy is not enforced for the statement.
+
+EVALUATE PER SESSION Specify this clause to evaluate the `audit_condition` once during the session. The `audit_condition` is evaluated for the first auditable statement that is executed during the session. If the `audit_condition` evaluates to `TRUE`, then the unified audit policy is enforced for all applicable statements for the rest of the session. If `FALSE`, then the unified audit policy is not enforced for all applicable statements for the rest of the session.
+
+EVALUATE PER INSTANCE Specify this clause to evaluate the `audit_condition` once during the lifetime of the instance. The `audit_condition` is evaluated for the first auditable statement that is executed during the instance lifetime. If the `audit_condition` evaluates to `TRUE`, then the unified audit policy is enforced for all applicable statements for the rest of the lifetime of the instance. If `FALSE`, then the unified audit policy is not enforced for all applicable statements for the rest of the lifetime of the instance.
+
+CONTAINER Clause
+
+Use the `CONTAINER` clause to specify the scope of the unified audit policy.
+
+* Specify `CONTAINER` `=` `ALL` to create a common unified audit policy. This type of policy is available to all pluggable databases (PDBs) in the CDB. The current container must be the root. If you specify the `ACTIONS` `object_action` `ON` or `ACTIONS` `ALL` `ON` clause, then you must specify a common object.
+* Specify `CONTAINER` `=` `CURRENT` to create a local unified audit policy in the current container. The current container can be the root or a PDB. If the current container is the root, then you cannot specify the clauses `ACTIONS` `system_action`, `ACTIONS` `ALL`, or `privilege_audit_clause`.
+
+If you omit the `CONTAINER` clause and the current container is the root, then `CONTAINER` `=` `ALL` is the default. If you omit the `CONTAINER` clause and the current container is a pluggable database (PDB), then `CONTAINER` `=` `CURRENT` is the default.
+
+Note:
+
+You cannot alter the scope of a unified audit policy after it has been created.
+
+Examples
+
+Auditing System Privileges: Example The following statement creates unified audit policy `table_pol`, which audits the system privileges `CREATE` `ANY` `TABLE` and `DROP` `ANY` `TABLE`:
+
+```
+CREATE AUDIT POLICY table_pol
+  PRIVILEGES CREATE ANY TABLE, DROP ANY TABLE;
+```
+
+The following statement verifies that `table_pol` now appears in the `AUDIT_UNIFIED_POLICIES` view:
+
+```
+SELECT *
+  FROM audit_unified_policies
+  WHERE policy_name = 'TABLE_POL';
+```
+
+Auditing Actions on Objects: Examples The following statement creates unified audit policy `dml_pol`, which audits `DELETE`, `INSERT`, and `UPDATE` actions on table `hr`.`employees`, and all auditable actions on table `hr`.`departments`:
+
+```
+CREATE AUDIT POLICY dml_pol
+  ACTIONS DELETE on hr.employees,
+          INSERT on hr.employees,
+          UPDATE on hr.employees,
+          ALL on hr.departments;
+```
+
+The following statement creates unified audit policy `read_dir_pol`, which audits `READ` actions on directory `bfile_dir` (created in ["Creating a Directory: Examples"](statements_5008.md#i2092417)):
+
+```
+CREATE AUDIT POLICY read_dir_pol
+  ACTIONS READ ON DIRECTORY bfile_dir;
+```
+
+Auditing System Actions: Examples The following query displays the standard RDBMS system actions that can be audited for the database:
+
+```
+SELECT name FROM auditable_system_actions
+  WHERE component = 'Standard'
+  ORDER BY name;
+
+NAME
+----
+ADMINISTER KEY MANAGEMENT
+ALL
+ALTER ASSEMBLY
+ALTER AUDIT POLICY
+ALTER CLUSTER
+...
+```
+
+The following statement creates unified audit policy `security_pol`, which audits the system action `ADMINISTER` `KEY` `MANAGEMENT`:
+
+```
+CREATE AUDIT POLICY security_pol
+  ACTIONS ADMINISTER KEY MANAGEMENT;
+```
+
+The following statement creates unified audit policy `all_actions_pol`, which audits all standard RDBMS system actions for the database:
+
+```
+CREATE AUDIT POLICY all_actions_pol
+  ACTIONS ALL;
+```
+
+Auditing Component Actions: Example The following query displays the actions that can be audited for Oracle Data Pump:
+
+```
+SELECT name FROM auditable_system_actions
+  WHERE component = 'Datapump';
+
+NAME
+----
+EXPORT
+IMPORT
+ALL
+```
+
+The following statement creates unified audit policy `dp_actions_pol`, which audits `IMPORT` actions for Oracle Data Pump:
+
+```
+CREATE AUDIT POLICY dp_actions_pol
+  ACTIONS COMPONENT = datapump IMPORT;
+```
+
+Auditing Roles: Example The following statement creates unified audit policy `java_pol`, which audits the predefined roles `java_admin` and `java_deploy`:
+
+```
+CREATE AUDIT POLICY java_pol
+  ROLES java_admin, java_deploy;
+```
+
+Auditing System Privileges, Actions, and Roles: Example The following statement creates unified audit policy `hr_admin_pol`, which audits multiple system privileges, actions, and roles:
+
+```
+CREATE AUDIT POLICY hr_admin_pol
+  PRIVILEGES CREATE ANY TABLE, DROP ANY TABLE
+  ACTIONS DELETE on hr.employees,
+          INSERT on hr.employees,
+          UPDATE on hr.employees,
+          ALL on hr.departments,
+          LOCK TABLE
+  ROLES audit_admin, audit_viewer;
+```
+
+Controlling When a Unified Audit Policy is Enforced: Examples The following statement creates unified audit policy `order_updates_pol`, which audits `UPDATE` actions on table `oe`.`orders`. This policy is enforced only when the auditable statement is issued by an external user. The audit condition is checked once per session.
+
+```
+CREATE AUDIT POLICY order_updates_pol
+  ACTIONS UPDATE ON oe.orders
+  WHEN 'SYS_CONTEXT(''USERENV'', ''IDENTIFICATION_TYPE'') = ''EXTERNAL'''
+  EVALUATE PER SESSION;
+```
+
+The following statement creates unified audit policy `emp_updates_pol`, which audits `DELETE`, `INSERT`, and `UPDATE` actions on table `hr`.`employees`. This policy is enforced only when the auditable statement is issued by a user who does not have a UID of 100, 105, or 107. The audit condition is checked for each auditable statement.
+
+```
+CREATE AUDIT POLICY emp_updates_pol
+  ACTIONS DELETE on hr.employees,
+          INSERT on hr.employees,
+          UPDATE on hr.employees
+  WHEN 'UID NOT IN (100, 105, 107)'
+  EVALUATE PER STATEMENT;
+```
+
+Creating a Local Unified Audit Policy: Example The following statement creates local unified audit policy `local_table_pol`, which audits the system privileges `CREATE` `ANY` `TABLE` and `DROP` `ANY` `TABLE` in the current container::
+
+```
+CREATE AUDIT POLICY local_table_pol
+  PRIVILEGES CREATE ANY TABLE, DROP ANY TABLE
+  CONTAINER = CURRENT;
+```
+
+Creating a Common Unified Audit Policy: Example The following statement creates common unified audit policy `common_role1_pol`, which audits the common role `c##role1` (created in `CREATE` `ROLE` ["Examples"](statements_6014.md#i2066883)) across the entire CDB:
+
+```
+CREATE AUDIT POLICY common_role1_pol
+  ROLES c##role1
+  CONTAINER = ALL;
+```
