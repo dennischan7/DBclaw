@@ -9,12 +9,12 @@
 
 | 项目 | 值 |
 |---|---|
-| **当前阶段** | 阶段0 ✅ → 阶段1 ✅ → 阶段2 ✅ |
+| **当前阶段** | 阶段0 ✅ → 阶段1 ✅ → 阶段2 ✅ → 阶段3 ✅ |
 | **Git 分支** | `dev` (开发中) |
-| **最新提交** | Phase 2 commit (待提交) |
+| **最新提交** | `866b53f` Phase 3: Harness规范引擎与意图路由 |
 | **基线提交** | `64bfc36` Initial: Hermes v0.9.0 + DBSafeGuard docs and library |
 | **测试数据库** | PostgreSQL 15 @ localhost:5437 (Docker: ent-health-postgres-kimi) |
-| **总测试数** | 134 (Phase 1: 78 + Phase 2: 56) |
+| **总测试数** | 189 (Phase 1: 78 + Phase 2: 56 + Phase 3: 55) |
 
 ---
 
@@ -142,15 +142,44 @@
 
 ---
 
-## 阶段3：Harness规范引擎与意图路由 ⬜ 未开始
+## 阶段3：Harness规范引擎与意图路由 ✅ 已完成
 
 | # | 任务 | 状态 | 提交 | 备注 |
 |---|------|------|------|------|
-| 3.1 | RAG 知识库检索优化 (切片≤1000 token) | ⬜ | | |
-| 3.2 | 意图分类 Prompt + 路由引擎 | ⬜ | | |
-| 3.3 | harnesses/stages/ 场景工作流规范 | ⬜ | | |
-| 3.4 | harnesses/taxonomy/ 意图分类规则 | ⬜ | | |
-| 3.5 | 规范热重载机制 | ⬜ | | |
+| 3.1 | RAG 知识库检索优化 (切片≤1000 token) | ✅ 已完成 | | TF-IDF评分 + token感知分块 + IDF加权 + 精确短语加分 |
+| 3.2 | 意图分类 Prompt + 路由引擎 | ✅ 已完成 | | 双路径: 关键词快速(0.95) + LLM回退(0.7), DB类型/版本检测 |
+| 3.3 | harnesses/stages/ 场景工作流规范 | ✅ 已完成 | | 6个工作流: query/dml/ddl/optimize/health/troubleshoot |
+| 3.4 | harnesses/taxonomy/ 意图分类规则 | ✅ 已完成 | | 12意图类别, 关键词正则, 升级规则, few-shot示例 |
+| 3.5 | 规范热重载机制 | ✅ 已完成 | | mtime检测 + 缓存失效 + YAML/MD双格式加载 |
+
+### Phase 3 关键实现
+
+**library_search.py** — TF-IDF RAG检索重写:
+1. **token感知分块**: `_chunk_document()` 按标题分段，超长段落再按段落拆分，每块≤1000 token (MAX_CHUNK_CHARS=4000)
+2. **TF-IDF评分**: `_score_chunk()` — 标题权重×3×IDF + log归一化TF×IDF×0.5
+3. **精确短语加分**: 完整短语匹配+5，标题匹配+8
+4. **块缓存**: `_get_chunks()` 按search_dir缓存，`invalidate_cache()` 手动失效
+
+**intent_router.py** — 意图分类与路由:
+1. **双路径分类**: `_classify_by_keywords()` 正则匹配(0.95置信度) → `_classify_by_description()` NL匹配(0.7)
+2. **DB类型检测**: `_detect_db_type()` 正则识别 mysql/postgresql/oracle/hive/sqlserver + 版本号
+3. **风险升级**: `_check_escalation()` — no_where_clause→L4, drop_column→L3, modify_column_type→L3
+4. **路由上下文**: `get_routing_context()` 返回工具链、审批需求、回滚需求、工作流文件
+5. **热重载**: mtime检测taxonomy YAML变更，自动重新加载
+
+**config_watcher.py** — 配置热重载:
+1. **mtime监控**: `HarnessConfigWatcher` 跟踪所有配置文件的修改时间
+2. **双格式加载**: YAML配置 + MD工作流规范
+3. **单例模式**: `get_config_watcher()` 全局唯一实例
+
+**context_injector.py** — 增强意图集成:
+1. 自动调用 `classify_intent()` 分析用户消息
+2. 注入意图分析摘要 (标签/置信度/风险/DB类型/工具链)
+3. 挂载对应stage工作流规范内容
+
+### Phase 3 关键修复
+
+1. **UPDATE无WHERE升级**: `dml_update` 类别缺少 `escalation_rules`，导致 `UPDATE users SET status = 0` 不升级到L4。修复: 添加 `no_where_clause→L4` 升级规则
 
 ---
 
@@ -234,4 +263,6 @@
 |------|------|------|
 | 2026-04-15 | `64bfc36` | 初始提交: Hermes v0.9.0 + 项目文档 + library/ 知识库 |
 | 2026-04-16 | `b7cd95b` | Phase 0 完成: DBA SafeGuard 插件骨架 (28文件, 3156行) |
-| 2026-04-16 | `pending` | Phase 1 完成: SQL双层校验深化 — 78项测试全部通过, 4项关键修复 |
+| 2026-04-16 | `36f554a` | Phase 1 完成: SQL双层校验深化 — 78项测试全部通过, 4项关键修复 |
+| 2026-04-16 | `9249dcb` | Phase 2 完成: 核心工具层与安全沙箱 — 56项测试, 累计134项 |
+| 2026-04-16 | `866b53f` | Phase 3 完成: Harness规范引擎与意图路由 — 55项测试, 累计189项 |

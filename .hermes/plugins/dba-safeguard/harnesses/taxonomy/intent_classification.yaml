@@ -1,0 +1,286 @@
+# DBA SafeGuard 意图分类规则
+# 用于识别用户需求类型、目标数据库、风险预判
+# 支持热重载 — 修改后自动生效
+
+# ============================================================
+# 意图类别定义
+# ============================================================
+intent_categories:
+  query:
+    label: "数据查询"
+    description: "只读查询操作 — SELECT, SHOW, DESCRIBE, EXPLAIN"
+    risk_preset: 0
+    required_tools:
+      - sql_validate
+      - explain_analyze
+    optional_tools:
+      - library_search
+    workflow: "query-execution"
+
+  dml_insert:
+    label: "数据插入"
+    description: "INSERT语句 — 新增数据行"
+    risk_preset: 1
+    required_tools:
+      - sql_validate
+      - explain_analyze
+      - rollback_generate
+    workflow: "dml-execution"
+
+  dml_update:
+    label: "数据更新"
+    description: "UPDATE语句 — 修改现有数据"
+    risk_preset: 2
+    required_tools:
+      - sql_validate
+      - explain_analyze
+      - rollback_generate
+    workflow: "dml-execution"
+    escalation_rules:
+      - condition: "no_where_clause"
+        target_level: 4
+
+  dml_delete:
+    label: "数据删除"
+    description: "DELETE语句 — 删除数据行"
+    risk_preset: 2
+    required_tools:
+      - sql_validate
+      - explain_analyze
+      - rollback_generate
+    workflow: "dml-execution"
+    escalation_rules:
+      - condition: "no_where_clause"
+        target_level: 4
+
+  ddl_create:
+    label: "对象创建"
+    description: "CREATE TABLE/INDEX/VIEW 等"
+    risk_preset: 2
+    required_tools:
+      - sql_validate
+      - rollback_generate
+      - library_search
+    workflow: "ddl-change"
+
+  ddl_alter:
+    label: "结构变更"
+    description: "ALTER TABLE — 修改表结构"
+    risk_preset: 2
+    required_tools:
+      - sql_validate
+      - rollback_generate
+      - metadata_read
+      - library_search
+    workflow: "ddl-change"
+    escalation_rules:
+      - condition: "drop_column"
+        target_level: 3
+      - condition: "modify_column_type"
+        target_level: 3
+
+  ddl_drop:
+    label: "对象删除"
+    description: "DROP TABLE/DATABASE/INDEX 等"
+    risk_preset: 4
+    required_tools:
+      - sql_validate
+      - rollback_generate
+      - metadata_read
+    workflow: "ddl-change"
+
+  ddl_truncate:
+    label: "表截断"
+    description: "TRUNCATE TABLE — 清空全表数据"
+    risk_preset: 3
+    required_tools:
+      - sql_validate
+      - rollback_generate
+    workflow: "ddl-change"
+
+  optimize:
+    label: "性能调优"
+    description: "索引优化、查询调优、执行计划分析"
+    risk_preset: 0
+    required_tools:
+      - explain_analyze
+      - metadata_read
+      - library_search
+    workflow: "optimization"
+
+  health_check:
+    label: "数据库巡检"
+    description: "数据库健康检查、状态监控、容量规划"
+    risk_preset: 0
+    required_tools:
+      - metadata_read
+    workflow: "health-check"
+
+  backup_restore:
+    label: "备份恢复"
+    description: "数据库备份/恢复操作"
+    risk_preset: 3
+    required_tools:
+      - metadata_read
+    workflow: "backup-restore"
+
+  troubleshoot:
+    label: "故障排查"
+    description: "锁等待、死锁、慢查询等问题排查"
+    risk_preset: 0
+    required_tools:
+      - explain_analyze
+      - metadata_read
+      - library_search
+    workflow: "troubleshooting"
+
+  general:
+    label: "通用咨询"
+    description: "数据库知识问答、概念解释、最佳实践"
+    risk_preset: 0
+    required_tools:
+      - library_search
+    workflow: null
+
+# ============================================================
+# 关键词匹配规则 (快速路径，不需要LLM)
+# ============================================================
+keyword_rules:
+  # 查询类
+  - patterns: ["^\\s*SELECT\\b", "^\\s*SHOW\\b", "^\\s*DESCRIBE\\b", "^\\s*DESC\\b", "^\\s*EXPLAIN\\b"]
+    intent: "query"
+    confidence: 0.95
+
+  # DML
+  - patterns: ["^\\s*INSERT\\b"]
+    intent: "dml_insert"
+    confidence: 0.95
+
+  - patterns: ["^\\s*UPDATE\\b"]
+    intent: "dml_update"
+    confidence: 0.95
+
+  - patterns: ["^\\s*DELETE\\b"]
+    intent: "dml_delete"
+    confidence: 0.95
+
+  # DDL
+  - patterns: ["^\\s*CREATE\\s+(TABLE|INDEX|VIEW|PROCEDURE|FUNCTION|TRIGGER)\\b"]
+    intent: "ddl_create"
+    confidence: 0.95
+
+  - patterns: ["^\\s*ALTER\\s+TABLE\\b"]
+    intent: "ddl_alter"
+    confidence: 0.95
+
+  - patterns: ["^\\s*DROP\\s+(TABLE|DATABASE|INDEX|VIEW|PROCEDURE|FUNCTION|TRIGGER)\\b"]
+    intent: "ddl_drop"
+    confidence: 0.95
+
+  - patterns: ["^\\s*TRUNCATE\\b"]
+    intent: "ddl_truncate"
+    confidence: 0.95
+
+  # 自然语言关键词 (较低置信度)
+  - patterns: ["索引优化", "查询优化", "慢查询", "执行计划", "optimize", "slow query", "performance"]
+    intent: "optimize"
+    confidence: 0.7
+
+  - patterns: ["巡检", "健康检查", "health check", "监控", "容量"]
+    intent: "health_check"
+    confidence: 0.7
+
+  - patterns: ["备份", "恢复", "backup", "restore", "dump", "import"]
+    intent: "backup_restore"
+    confidence: 0.7
+
+  - patterns: ["死锁", "锁等待", "deadlock", "lock wait", "排查", "troubleshoot"]
+    intent: "troubleshoot"
+    confidence: 0.7
+
+# ============================================================
+# 数据库类型识别规则
+# ============================================================
+db_type_rules:
+  mysql:
+    patterns: ["mysql", "innodb", "myisam", "mariadb"]
+    version_patterns:
+      "5.7": ["5\\.7", "mysql.*5\\.7"]
+      "8.0": ["8\\.0", "mysql.*8\\.0"]
+      "8.4": ["8\\.4", "mysql.*8\\.4"]
+
+  postgresql:
+    patterns: ["postgresql", "postgres", "pg", "psql"]
+    version_patterns:
+      "14": ["pg.*14", "postgres.*14"]
+      "15": ["pg.*15", "postgres.*15"]
+      "16": ["pg.*16", "postgres.*16"]
+
+  oracle:
+    patterns: ["oracle", "ora", "plsql", "pl/sql"]
+    version_patterns:
+      "11g": ["11g"]
+      "12c": ["12c"]
+      "19c": ["19c"]
+      "21c": ["21c"]
+      "23c": ["23c"]
+
+  hive:
+    patterns: ["hive", "hiveql", "hql", "beeline"]
+
+  sqlserver:
+    patterns: ["sqlserver", "mssql", "sql server", "tsql", "t-sql"]
+
+# ============================================================
+# 少样本示例 (用于LLM分类 fallback)
+# ============================================================
+few_shot_examples:
+  - input: "帮我查一下users表里有多少条数据"
+    intent: "query"
+    db_type: null
+    reasoning: "用户要求查询数据量，属于只读SELECT COUNT操作"
+
+  - input: "往orders表插入一条订单记录"
+    intent: "dml_insert"
+    db_type: null
+    reasoning: "用户要求插入数据，属于INSERT操作"
+
+  - input: "把users表里id=100的用户名改成test"
+    intent: "dml_update"
+    db_type: null
+    reasoning: "用户要求修改数据，属于UPDATE操作，有WHERE条件"
+
+  - input: "删除orders表里所有过期订单"
+    intent: "dml_delete"
+    db_type: null
+    reasoning: "用户要求删除数据，属于DELETE操作"
+
+  - input: "给users表加一个phone字段"
+    intent: "ddl_alter"
+    db_type: null
+    reasoning: "用户要求修改表结构添加列，属于ALTER TABLE ADD COLUMN"
+
+  - input: "删除临时表tmp_data"
+    intent: "ddl_drop"
+    db_type: null
+    reasoning: "用户要求删除表，属于DROP TABLE操作"
+
+  - input: "MySQL 8.0的orders表查询很慢，怎么优化"
+    intent: "optimize"
+    db_type: "mysql"
+    reasoning: "用户反映查询慢，属于性能调优，目标数据库MySQL 8.0"
+
+  - input: "检查一下PostgreSQL数据库的运行状态"
+    intent: "health_check"
+    db_type: "postgresql"
+    reasoning: "用户要求检查数据库状态，属于巡检操作"
+
+  - input: "Oracle 19c出现了死锁，帮我分析一下"
+    intent: "troubleshoot"
+    db_type: "oracle"
+    reasoning: "用户反映死锁问题，属于故障排查，目标Oracle 19c"
+
+  - input: "什么是索引覆盖扫描"
+    intent: "general"
+    db_type: null
+    reasoning: "用户询问数据库概念，属于通用知识咨询"

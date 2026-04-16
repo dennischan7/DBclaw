@@ -3,7 +3,8 @@
 核心能力:
   - 物理目录隔离: 按数据库类型+版本锁定检索路径
   - 强制检索: SQL生成/校验环节必须触发
-  - 切片匹配: 基于heading切分，单片≤1000 token
+  - Token感知切片: 基于heading切分，单片≤1000 token (~4000 chars)
+  - 多级评分: 标题权重×3 + 精确匹配×2 + 关键词频率
 
 安全约束:
   - 禁止跨库检索（Oracle操作不能搜MySQL文档）
@@ -14,15 +15,24 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import re
+from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("dba_safeguard.tools.library_search")
 
 # Project root (where library/ lives)
 _PROJECT_ROOT = Path(__file__).parent.parent.parent.parent.parent
+
+# Token estimation: ~4 chars per token for English, ~2 chars for CJK
+MAX_CHUNK_TOKENS = 1000
+MAX_CHUNK_CHARS = MAX_CHUNK_TOKENS * 4  # conservative English estimate
+
+# Cache for indexed chunks (invalidated on search_path change)
+_chunk_cache: Dict[str, List[Dict[str, Any]]] = {}
 
 
 def search_library(
@@ -40,9 +50,10 @@ def search_library(
         max_results: Maximum number of results to return
 
     Returns:
-        {"results": [{"file": str, "section": str, "content": str, "score": float}]}
+        {"results": [{"file": str, "section": str, "content": str, "score": float}],
+         "search_path": str, "total_chunks": int}
     """
-    result: Dict[str, Any] = {"results": [], "search_path": ""}
+    result: Dict[str, Any] = {"results": [], "search_path": "", "total_chunks": 0}
 
     # Build search path with isolation
     lib_path = _PROJECT_ROOT / "library"
@@ -76,59 +87,84 @@ def search_library(
 
     result["search_path"] = str(search_dir.relative_to(_PROJECT_ROOT))
 
-    # Search MD files
-    matches = _search_md_files(search_dir, query, max_results)
+    # Get or build chunk index
+    chunks = _get_chunks(search_dir)
+    result["total_chunks"] = len(chunks)
+
+    # Score and rank
+    matches = _rank_chunks(chunks, query, max_results)
     result["results"] = matches
 
     return result
 
 
-def _search_md_files(
-    directory: Path,
-    query: str,
-    max_results: int,
-) -> List[Dict[str, Any]]:
-    """Search Markdown files for relevant sections."""
-    query_lower = query.lower()
-    query_terms = [t.strip() for t in re.split(r'\s+', query_lower) if len(t.strip()) > 1]
+def _get_chunks(search_dir: Path) -> List[Dict[str, Any]]:
+    """Get token-aware chunks for a search directory (with caching)."""
+    cache_key = str(search_dir)
+    if cache_key in _chunk_cache:
+        return _chunk_cache[cache_key]
 
-    candidates: List[Dict[str, Any]] = []
-
-    for md_file in directory.rglob("*.md"):
+    chunks: List[Dict[str, Any]] = []
+    for md_file in search_dir.rglob("*.md"):
         try:
             text = md_file.read_text(encoding="utf-8", errors="ignore")
-            sections = _split_by_headings(text)
-
-            for section_title, section_content in sections:
-                if not section_content.strip():
-                    continue
-
-                score = _score_section(section_title, section_content, query_terms)
-                if score > 0:
-                    # Truncate to ~1000 tokens (~4000 chars)
-                    content_preview = section_content[:4000]
-                    if len(section_content) > 4000:
-                        content_preview += "\n... (truncated)"
-
-                    candidates.append({
-                        "file": str(md_file.relative_to(directory)),
-                        "section": section_title,
-                        "content": content_preview,
-                        "score": score,
-                    })
+            rel_path = str(md_file.relative_to(search_dir))
+            file_chunks = _chunk_document(text, rel_path)
+            chunks.extend(file_chunks)
         except Exception as e:
             logger.debug("Error reading %s: %s", md_file, e)
 
-    # Sort by score descending and return top results
-    candidates.sort(key=lambda x: x["score"], reverse=True)
-    return candidates[:max_results]
+    _chunk_cache[cache_key] = chunks
+    return chunks
 
 
-def _split_by_headings(text: str) -> List[tuple]:
+def invalidate_cache(search_dir: Optional[str] = None) -> None:
+    """Invalidate chunk cache. If search_dir given, only that path."""
+    if search_dir:
+        _chunk_cache.pop(search_dir, None)
+    else:
+        _chunk_cache.clear()
+
+
+def _chunk_document(text: str, file_path: str) -> List[Dict[str, Any]]:
+    """Split a document into token-aware chunks (≤1000 tokens each).
+
+    Strategy:
+      1. Split by headings first
+      2. If a section exceeds MAX_CHUNK_CHARS, split by paragraphs
+      3. Each chunk keeps its heading context for relevance
+    """
+    sections = _split_by_headings(text)
+    chunks: List[Dict[str, Any]] = []
+
+    for title, content in sections:
+        if not content.strip():
+            continue
+
+        if len(content) <= MAX_CHUNK_CHARS:
+            chunks.append({
+                "file": file_path,
+                "section": title,
+                "content": content,
+            })
+        else:
+            # Split oversized section by paragraphs
+            sub_chunks = _split_by_paragraphs(content, title, MAX_CHUNK_CHARS)
+            for i, sub in enumerate(sub_chunks):
+                chunks.append({
+                    "file": file_path,
+                    "section": f"{title} (part {i + 1})" if len(sub_chunks) > 1 else title,
+                    "content": sub,
+                })
+
+    return chunks
+
+
+def _split_by_headings(text: str) -> List[Tuple[str, str]]:
     """Split markdown text by headings."""
-    sections = []
+    sections: List[Tuple[str, str]] = []
     current_title = "(top)"
-    current_content = []
+    current_content: List[str] = []
 
     for line in text.split("\n"):
         if line.startswith("#"):
@@ -145,20 +181,101 @@ def _split_by_headings(text: str) -> List[tuple]:
     return sections
 
 
-def _score_section(title: str, content: str, query_terms: List[str]) -> float:
-    """Score a section's relevance to the query."""
-    title_lower = title.lower()
-    content_lower = content.lower()
+def _split_by_paragraphs(text: str, title: str, max_chars: int) -> List[str]:
+    """Split text into chunks at paragraph boundaries, keeping under max_chars."""
+    paragraphs = re.split(r'\n\s*\n', text)
+    chunks: List[str] = []
+    current: List[str] = []
+    current_len = 0
+
+    for para in paragraphs:
+        para_len = len(para)
+        if current_len + para_len > max_chars and current:
+            chunks.append("\n\n".join(current))
+            current = [para]
+            current_len = para_len
+        else:
+            current.append(para)
+            current_len += para_len
+
+    if current:
+        chunks.append("\n\n".join(current))
+
+    return chunks
+
+
+def _rank_chunks(
+    chunks: List[Dict[str, Any]],
+    query: str,
+    max_results: int,
+) -> List[Dict[str, Any]]:
+    """Rank chunks by relevance using multi-signal scoring."""
+    query_lower = query.lower()
+    query_terms = [t.strip() for t in re.split(r'\s+', query_lower) if len(t.strip()) > 1]
+    if not query_terms:
+        return []
+
+    # Build document frequency for IDF
+    num_chunks = len(chunks)
+    if num_chunks == 0:
+        return []
+
+    doc_freq: Counter = Counter()
+    for chunk in chunks:
+        combined = (chunk["section"] + " " + chunk["content"]).lower()
+        seen = set()
+        for term in query_terms:
+            if term in combined and term not in seen:
+                doc_freq[term] += 1
+                seen.add(term)
+
+    scored: List[Dict[str, Any]] = []
+    for chunk in chunks:
+        score = _score_chunk(chunk, query_terms, query_lower, doc_freq, num_chunks)
+        if score > 0:
+            scored.append({
+                "file": chunk["file"],
+                "section": chunk["section"],
+                "content": chunk["content"],
+                "score": round(score, 3),
+            })
+
+    scored.sort(key=lambda x: x["score"], reverse=True)
+    return scored[:max_results]
+
+
+def _score_chunk(
+    chunk: Dict[str, Any],
+    query_terms: List[str],
+    query_lower: str,
+    doc_freq: Counter,
+    num_chunks: int,
+) -> float:
+    """Multi-signal scoring for a chunk."""
+    title_lower = chunk["section"].lower()
+    content_lower = chunk["content"].lower()
     score = 0.0
 
     for term in query_terms:
-        # Title match is weighted higher
+        idf = math.log(1 + num_chunks / (1 + doc_freq.get(term, 0)))
+
+        # Title match (high weight)
         if term in title_lower:
-            score += 3.0
-        # Content match
-        count = content_lower.count(term)
-        if count > 0:
-            score += min(count, 5) * 0.5
+            score += 3.0 * idf
+
+        # Content TF-IDF
+        tf = content_lower.count(term)
+        if tf > 0:
+            norm_tf = 1 + math.log(tf)  # log-normalized TF
+            score += norm_tf * idf * 0.5
+
+    # Bonus: exact phrase match in content
+    if len(query_terms) > 1 and query_lower in content_lower:
+        score += 5.0
+
+    # Bonus: exact phrase match in title
+    if len(query_terms) > 1 and query_lower in title_lower:
+        score += 8.0
 
     return score
 

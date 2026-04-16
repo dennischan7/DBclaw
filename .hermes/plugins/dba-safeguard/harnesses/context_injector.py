@@ -67,14 +67,56 @@ async def pre_llm_call_hook(
     except Exception:
         pass
 
-    # 3. Check if user message mentions SQL-related terms → inject library hint
+    # 3. Classify intent and mount relevant harness specs
     user_msg = _get_last_user_message(messages)
-    if user_msg and _detect_sql_intent(user_msg):
-        injections.append(
-            "\n## 提示\n"
-            "检测到SQL相关操作意图。请先使用 `library_search` 查阅官方文档，"
-            "确认目标数据库方言的正确语法后再生成SQL。"
-        )
+    if user_msg:
+        try:
+            from .intent_router import classify_intent, get_routing_context
+            from .config_watcher import get_config_watcher
+
+            watcher = get_config_watcher()
+            watcher.check_and_reload()  # hot-reload any changed configs
+
+            intent = classify_intent(user_msg, context={"dialect": None})
+            routing = get_routing_context(intent)
+
+            # Inject intent classification summary
+            intent_info = (
+                f"\n## 意图分析\n"
+                f"- **分类**: {intent['label']} ({intent['intent']})\n"
+                f"- **置信度**: {intent['confidence']:.0%}\n"
+                f"- **风险预判**: L{intent['risk_preset']}\n"
+            )
+            if intent.get("db_type"):
+                intent_info += f"- **目标数据库**: {intent['db_type']}"
+                if intent.get("db_version"):
+                    intent_info += f" {intent['db_version']}"
+                intent_info += "\n"
+            if routing.get("tool_sequence"):
+                intent_info += f"- **建议工具链**: {' → '.join(routing['tool_sequence'])}\n"
+            injections.append(intent_info)
+
+            # Mount stage workflow if available
+            if routing.get("workflow_file"):
+                workflow_content = watcher.get_stage_workflow(
+                    intent.get("workflow", "")
+                )
+                if workflow_content:
+                    injections.append(
+                        f"\n## 当前工作流规范\n\n{workflow_content[:2000]}"
+                    )
+
+        except Exception as e:
+            logger.debug("Intent classification skipped: %s", e)
+
+        # Fallback: if no intent classification, use simple SQL detection
+        if not any("意图分析" in inj for inj in injections):
+            if _detect_sql_intent(user_msg):
+                injections.append(
+                    "\n## 提示\n"
+                    "检测到SQL相关操作意图。请先使用 `library_search` 查阅官方文档，"
+                    "确认目标数据库方言的正确语法后再生成SQL。"
+                )
 
     if not injections:
         return None
