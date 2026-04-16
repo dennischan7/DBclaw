@@ -9,12 +9,12 @@
 
 | 项目 | 值 |
 |---|---|
-| **当前阶段** | 阶段0 ✅ → 阶段1 ✅ → 阶段2 ✅ → 阶段3 ✅ → 阶段4 ✅ |
+| **当前阶段** | 阶段0 ✅ → 阶段1 ✅ → 阶段2 ✅ → 阶段3 ✅ → 阶段4 ✅ → 阶段5 ✅ |
 | **Git 分支** | `dev` (开发中) |
-| **最新提交** | `7f71fbb` Phase 4: 闭环执行引擎与多智能体流水线 |
+| **最新提交** | `dd396bf` Phase 5: 企业级多级记忆中枢 |
 | **基线提交** | `64bfc36` Initial: Hermes v0.9.0 + DBSafeGuard docs and library |
 | **测试数据库** | PostgreSQL 15 @ localhost:5437 (Docker: ent-health-postgres-kimi) |
-| **总测试数** | 238 (Phase 1: 78 + Phase 2: 56 + Phase 3: 55 + Phase 4: 49) |
+| **总测试数** | 299 (Phase 1: 78 + Phase 2: 56 + Phase 3: 55 + Phase 4: 49 + Phase 5: 61) |
 
 ---
 
@@ -226,14 +226,62 @@
 
 ---
 
-## 阶段5：企业级多级记忆中枢 ⬜ 未开始
+## 阶段5：企业级多级记忆中枢 ✅ 已完成
 
 | # | 任务 | 状态 | 提交 | 备注 |
 |---|------|------|------|------|
-| 5.1 | L1 工作区记忆 (4000 token 上限) | ⬜ | | |
-| 5.2 | L2 情景会话记忆 (DBA 标签扩展) | ⬜ | | |
-| 5.3 | L3 运维经验记忆 (向量化 + 人工确认) | ⬜ | | |
-| 5.4 | L4 业务图谱与用户建模 | ⬜ | | |
+| 5.1 | L1 工作区记忆 (4000 token 上限) | ✅ 已完成 | | ContextPriority 4级优先级, token预算淘汰, render_context() |
+| 5.2 | L2 情景会话记忆 (DBA 标签扩展) | ✅ 已完成 | | SQLite FTS5, DBA标签(db_type/operation_type/risk_level/instance_name), 30天归档 |
+| 5.3 | L3 运维经验记忆 (蒸馏 + 人工确认) | ✅ 已完成 | | 经验蒸馏, pending→confirmed工作流, 版本管理, FTS5搜索, 自动分类 |
+| 5.4 | L4 业务图谱与用户建模 | ✅ 已完成 | | 表关系/业务字典(FTS5)/业务规则(enum/range/not_null)/用户画像/数据字典导入 |
+
+### Phase 5 关键实现
+
+**l1_workspace.py** — L1 工作区记忆:
+1. **Token预算管理**: 默认4000 token上限, 3 chars/token估算, 实时跟踪total_tokens
+2. **优先级淘汰**: `ContextPriority` 4级 (CRITICAL>HIGH>NORMAL>LOW), CRITICAL永不淘汰
+3. **便捷方法**: `set_task_state()`, `set_metadata()`, `add_validation_result()`, `add_retry_draft()`
+4. **上下文渲染**: `render_context()` 按优先级排序输出, `snapshot()` 完整快照
+
+**l2_session_store.py** — L2 情景会话记忆:
+1. **SQLite WAL + FTS5**: `session_records`表 + `session_fts` 全文索引
+2. **DBA标签**: db_type, operation_type, risk_level, instance_name — 精确过滤
+3. **会话归档**: `archive_old_sessions()` 30天默认, 标记is_archived
+4. **相似操作检索**: `search_similar_operations()` 按操作类型+DB类型匹配
+
+**l3_experience.py** — L3 运维经验记忆:
+1. **经验蒸馏**: `distill_experience()` 仅从成功任务提取, 创建pending条目
+2. **人工确认**: pending→confirmed (confirm) / rejected (reject) 工作流
+3. **版本管理**: `create_new_version()` 创建新版本, `get_version_history()` 版本链
+4. **自动分类**: `_classify_experience()` → ddl_workflow/pitfall/optimization/sql_pattern/best_practice
+5. **SQL模式提取**: `_extract_sql_pattern()` 归一化SQL结构
+
+**l4_business_graph.py** — L4 业务图谱:
+1. **表关系图**: `add_table_relation()` 支持foreign_key/derived/etl关系, 方向过滤
+2. **业务字典**: FTS5搜索, UPSERT语义, `import_data_dictionary()` 批量导入
+3. **业务规则**: enum_check/range_check/not_null, `check_rules()` 规则评估
+4. **用户画像**: `update_user_profile()` 偏好/技能/关注范围, `record_user_operation()` 操作统计
+5. **图上下文**: `get_graph_context()` 聚合LLM注入上下文
+
+**dba_memory_provider.py** — 统一编排层重写:
+1. **4层统一**: L1(workspace)+L2(session)+L3(experience)+L4(graph) 全生命周期管理
+2. **record_operation()**: 同步写入L1+L2+L4三层
+3. **on_session_end()**: L1归档→L2, 已完成任务→L3蒸馏
+4. **get_injection_context()**: 聚合L1+L2+L3+L4上下文供pre_llm_call注入
+5. **工具处理器**: `handle_dba_memory_search()` L3+L2联合搜索, `handle_dba_memory_save()` L3保存
+
+### Phase 5 新增文件
+
+```
+memory/
+├── l1_workspace.py          # L1 工作区记忆 (~250 lines)
+├── l2_session_store.py      # L2 情景会话记忆 (~260 lines)
+├── l3_experience.py         # L3 运维经验记忆 (~380 lines)
+├── l4_business_graph.py     # L4 业务图谱 (~440 lines)
+└── dba_memory_provider.py   # 统一编排层 (重写 ~350 lines)
+tests/
+└── test_phase5.py           # 61项测试 (~490 lines)
+```
 
 ---
 
