@@ -113,6 +113,23 @@ def _read_columns(conn, dialect: str, database: str, table: str) -> str:
         for r in rows:
             lines.append(f"| {r[0]} | {r[1]} | {r[2]} | {r[3]} | {r[4]} |")
         return "\n".join(lines)
+    elif dialect in ("postgresql", "postgres"):
+        schema = database or "public"
+        rows = conn.execute(text(
+            "SELECT c.column_name, c.data_type, c.is_nullable, c.column_default, "
+            "COALESCE(pgd.description, '') AS column_comment "
+            "FROM information_schema.columns c "
+            "LEFT JOIN pg_catalog.pg_statio_all_tables st "
+            "  ON st.schemaname = c.table_schema AND st.relname = c.table_name "
+            "LEFT JOIN pg_catalog.pg_description pgd "
+            "  ON pgd.objoid = st.relid AND pgd.objsubid = c.ordinal_position "
+            "WHERE c.table_schema = :schema AND c.table_name = :tbl "
+            "ORDER BY c.ordinal_position"
+        ), {"schema": schema, "tbl": table}).fetchall()
+        lines = ["| 列名 | 类型 | 可空 | 默认值 | 注释 |", "|---|---|---|---|---|"]
+        for r in rows:
+            lines.append(f"| {r[0]} | {r[1]} | {r[2]} | {r[3] or ''} | {r[4]} |")
+        return "\n".join(lines)
     return "该数据库方言暂不支持columns查询"
 
 
@@ -126,6 +143,18 @@ def _read_indexes(conn, dialect: str, database: str, table: str) -> str:
         for r in rows:
             lines.append(f"| {r[2]} | {r[4]} | {'否' if r[1] else '是'} | {r[10]} |")
         return "\n".join(lines)
+    elif dialect in ("postgresql", "postgres"):
+        schema = database or "public"
+        rows = conn.execute(text(
+            "SELECT indexname, indexdef "
+            "FROM pg_indexes "
+            "WHERE schemaname = :schema AND tablename = :tbl "
+            "ORDER BY indexname"
+        ), {"schema": schema, "tbl": table}).fetchall()
+        lines = ["| 索引名 | 定义 |", "|---|---|"]
+        for r in rows:
+            lines.append(f"| {r[0]} | {r[1]} |")
+        return "\n".join(lines)
     return "该数据库方言暂不支持indexes查询"
 
 
@@ -135,6 +164,48 @@ def _read_ddl(conn, dialect: str, database: str, table: str) -> str:
         rows = conn.execute(text(f"SHOW CREATE TABLE `{database}`.`{table}`")).fetchall()
         if rows:
             return rows[0][1]
+    elif dialect in ("postgresql", "postgres"):
+        schema = database or "public"
+        # Reconstruct DDL from information_schema (PG has no SHOW CREATE TABLE)
+        cols = conn.execute(text(
+            "SELECT column_name, data_type, character_maximum_length, "
+            "is_nullable, column_default "
+            "FROM information_schema.columns "
+            "WHERE table_schema = :schema AND table_name = :tbl "
+            "ORDER BY ordinal_position"
+        ), {"schema": schema, "tbl": table}).fetchall()
+        if not cols:
+            return f"表 {schema}.{table} 不存在或无列信息"
+        ddl_lines = [f'CREATE TABLE "{schema}"."{table}" (']
+        col_defs = []
+        for c in cols:
+            col_name, data_type, max_len, nullable, default = c
+            type_str = data_type
+            if max_len:
+                type_str = f"{data_type}({max_len})"
+            parts = [f'  "{col_name}" {type_str}']
+            if nullable == "NO":
+                parts.append("NOT NULL")
+            if default:
+                parts.append(f"DEFAULT {default}")
+            col_defs.append(" ".join(parts))
+        # Add primary key constraint
+        pk = conn.execute(text(
+            "SELECT kcu.column_name "
+            "FROM information_schema.table_constraints tc "
+            "JOIN information_schema.key_column_usage kcu "
+            "  ON tc.constraint_name = kcu.constraint_name "
+            "  AND tc.table_schema = kcu.table_schema "
+            "WHERE tc.constraint_type = 'PRIMARY KEY' "
+            "  AND tc.table_schema = :schema AND tc.table_name = :tbl "
+            "ORDER BY kcu.ordinal_position"
+        ), {"schema": schema, "tbl": table}).fetchall()
+        if pk:
+            pk_cols = ", ".join(f'"{r[0]}"' for r in pk)
+            col_defs.append(f"  PRIMARY KEY ({pk_cols})")
+        ddl_lines.append(",\n".join(col_defs))
+        ddl_lines.append(");")
+        return "\n".join(ddl_lines)
     return "该数据库方言暂不支持DDL查询"
 
 

@@ -78,7 +78,10 @@ async def pre_tool_call_hook(
         return {"block": True, "message": "SQL语句为空，拒绝执行"}
 
     # Step 1: Validate SQL if not already validated
-    from ..tools.sql_ast_validator import validate_sql
+    try:
+        from ..tools.sql_ast_validator import validate_sql
+    except ImportError:
+        from tools.sql_ast_validator import validate_sql
 
     validation = validate_sql(sql, dialect)
 

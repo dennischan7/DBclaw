@@ -76,23 +76,30 @@
 
 ---
 
-## 阶段1：SQL双层校验深化 🔜 即将开始
+## 阶段1：SQL双层校验深化 ✅ 已完成
 
 > **目标**: 将 sql_ast_validator.py 和 explain_analyzer.py 从骨架提升为
 > 可通过真实数据库验证的生产级实现，跑通 `校验 → EXPLAIN → 风险定级` 完整链路。
 
 | # | 任务 | 状态 | 提交 | 备注 |
 |---|------|------|------|------|
-| 1.1 | 安装 DBA 依赖 (sqlglot, sqlalchemy, psycopg2) | ⬜ 未开始 | | |
-| 1.2 | 配置测试 PostgreSQL 实例 (dba_config.yaml) | ⬜ 未开始 | | Docker: localhost:5437 |
-| 1.3 | sql_ast_validator 单元测试 (纯离线) | ⬜ 未开始 | | 覆盖 SELECT/INSERT/UPDATE/DELETE/DDL/各方言 |
-| 1.4 | sql_ast_validator PG 方言强化 | ⬜ 未开始 | | 校验 PostgreSQL 15 特有语法 |
-| 1.5 | db_connector → PostgreSQL 连接验证 | ⬜ 未开始 | | 通过测试容器连通 |
-| 1.6 | explain_analyzer → 真实 EXPLAIN 验证 | ⬜ 未开始 | | 用 PG 真实表跑执行计划 |
-| 1.7 | metadata_reader → PG information_schema 验证 | ⬜ 未开始 | | 读取真实表结构 |
-| 1.8 | risk_interceptor 集成测试 | ⬜ 未开始 | | pre_tool_call → validate → HITL 链路 |
-| 1.9 | library_search → PG 文档检索验证 | ⬜ 未开始 | | library/postgres/15/ 内容匹配 |
-| 1.10 | 端到端链路测试: validate → explain → risk → audit | ⬜ 未开始 | | 全流程打通 |
+| 1.1 | 安装 DBA 依赖 (sqlglot, sqlalchemy, psycopg2) | ✅ 已完成 | | sqlglot 30.4.3, sqlalchemy 2.0.48, psycopg2-binary |
+| 1.2 | 配置测试 PostgreSQL 实例 (dba_config.yaml) | ✅ 已完成 | 6ee1678 | Docker: localhost:5437 |
+| 1.3 | sql_ast_validator 单元测试 (纯离线) | ✅ 已完成 | | 31项测试全部通过 |
+| 1.4 | sql_ast_validator PG 方言强化 | ✅ 已完成 | | ALTER TABLE子操作识别(ADD/DROP/MODIFY/RENAME) |
+| 1.5 | db_connector → PostgreSQL 连接验证 | ✅ 已完成 | | UTF-8编码修复 + readonly SELECT 1通过 |
+| 1.6 | explain_analyzer → 真实 EXPLAIN 验证 | ✅ 已完成 | | PG EXPLAIN (ANALYZE false, COSTS true, FORMAT TEXT) 通过 |
+| 1.7 | metadata_reader → PG information_schema 验证 | ✅ 已完成 | | **新增**: columns(information_schema) + indexes(pg_indexes) + DDL重建 |
+| 1.8 | risk_interceptor 集成测试 | ✅ 已完成 | | L0放行/L1通知/L2人工确认/L3-L4阻断 全链路 |
+| 1.9 | library_search → PG 文档检索验证 | ✅ 已完成 | | 跨库隔离验证通过 |
+| 1.10 | 端到端链路测试: validate → explain → risk → audit | ✅ 已完成 | | **78项测试全部通过** |
+
+### Phase 1 关键修复
+
+1. **sql_ast_validator**: 增强 `_identify_operation()` ALTER TABLE子操作检测(DROP/ADD/MODIFY/RENAME)，修复 `ALTER TABLE DROP COLUMN` 误分为L2的bug
+2. **db_connector**: `load_config()` 添加 `encoding="utf-8"` 参数，修复Windows下中文注释YAML文件读取失败
+3. **metadata_reader**: 新增PG支持 — `_read_columns()`(information_schema.columns + pg_description注释), `_read_indexes()`(pg_indexes), `_read_ddl()`(information_schema重建DDL含主键)
+4. **risk_interceptor**: 修复相对导入问题，支持包内外两种导入方式
 
 ---
 
@@ -205,3 +212,4 @@
 |------|------|------|
 | 2026-04-15 | `64bfc36` | 初始提交: Hermes v0.9.0 + 项目文档 + library/ 知识库 |
 | 2026-04-16 | `b7cd95b` | Phase 0 完成: DBA SafeGuard 插件骨架 (28文件, 3156行) |
+| 2026-04-16 | `pending` | Phase 1 完成: SQL双层校验深化 — 78项测试全部通过, 4项关键修复 |

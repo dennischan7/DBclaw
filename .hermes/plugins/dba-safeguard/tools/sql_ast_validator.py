@@ -171,6 +171,19 @@ def _identify_operation(stmt) -> str:
                 kind = getattr(stmt, "kind", "")
                 if kind:
                     return f"CREATE {kind.upper()}"
+            if name == "ALTER":
+                kind = getattr(stmt, "kind", "")
+                prefix = f"ALTER {kind.upper()}" if kind else "ALTER"
+                # Determine sub-action: ADD, DROP, MODIFY, RENAME, ALTER
+                actions = stmt.args.get("actions", [])
+                for action in (actions if isinstance(actions, list) else [actions]):
+                    if action is None:
+                        continue
+                    action_sql = action.sql().upper().strip()
+                    for sub_op in ("DROP", "RENAME", "MODIFY", "ALTER", "ADD"):
+                        if action_sql.startswith(sub_op):
+                            return f"{prefix} {sub_op}"
+                return prefix
             return name
 
     # Fallback: check SQL text

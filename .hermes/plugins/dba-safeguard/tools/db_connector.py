@@ -42,7 +42,7 @@ class ConnectionManager:
             return
         try:
             import yaml
-            with open(config_path) as f:
+            with open(config_path, encoding="utf-8") as f:
                 self._config = yaml.safe_load(f) or {}
         except Exception as e:
             logger.error("Failed to load DBA config: %s", e)
