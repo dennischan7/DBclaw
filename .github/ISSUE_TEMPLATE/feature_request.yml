@@ -8,16 +8,16 @@ body:
       value: |
         Thanks for the suggestion! Before submitting, please consider:
 
-        - **Is this a new skill?** Most capabilities should be [skills, not tools](https://github.com/NousResearch/hermes-agent/blob/main/CONTRIBUTING.md#should-it-be-a-skill-or-a-tool). If it's a specialized integration (crypto, NFT, niche SaaS), it belongs on the Skills Hub, not bundled.
-        - **Search [existing issues](https://github.com/NousResearch/hermes-agent/issues)** — someone may have already proposed this.
+        - Does this belong to DBclaw's database workflow scope, instead of general upstream Hermes capability work?
+        - Search existing issues first — someone may already have proposed it.
 
   - type: textarea
     id: problem
     attributes:
       label: Problem or Use Case
-      description: What problem does this solve? What are you trying to do that you can't today?
+      description: What database workflow problem does this solve? What are you trying to do that you can't today?
       placeholder: |
-        I'm trying to use Hermes with [provider/platform/workflow] but currently
+        I'm trying to use DBclaw with [database/workflow/environment] but currently
         there's no way to...
     validations:
       required: true
@@ -26,9 +26,9 @@ body:
     id: solution
     attributes:
       label: Proposed Solution
-      description: How do you think this should work? Be as specific as you can — CLI flags, config options, UI behavior.
+      description: How do you think this should work? Be as specific as you can — pipeline behavior, UI behavior, config, SQL validation, approvals.
       placeholder: |
-        Add a `--foo` flag to `hermes chat` that enables...
+        Add a `--foo` flag to `dbclaw` that enables...
         Or: Add a config key `bar.baz` that controls...
     validations:
       required: true
@@ -44,12 +44,12 @@ body:
     attributes:
       label: Feature Type
       options:
-        - New tool
-        - New bundled skill
-        - CLI improvement
-        - Gateway / messaging improvement
+        - SQL generation / intent routing
+        - Safety pipeline / risk rule
+        - Approval / audit / rollback
+        - WebUI improvement
         - Configuration option
-        - Performance / reliability
+        - RAG / documentation enhancement
         - Developer experience (tests, docs, CI)
         - Other
     validations:

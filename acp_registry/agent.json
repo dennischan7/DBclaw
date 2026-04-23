@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "name": "hermes-agent",
-  "display_name": "Hermes Agent",
-  "description": "AI agent by Nous Research with 90+ tools, persistent memory, and multi-platform support",
+  "name": "dbclaw",
+  "display_name": "DBclaw",
+  "description": "Database expert system with document-grounded SQL generation, safety pipelines, auditability, approvals, and DBA-focused workflows",
   "icon": "icon.svg",
   "distribution": {
     "type": "command",

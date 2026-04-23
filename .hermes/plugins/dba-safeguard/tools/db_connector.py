@@ -109,7 +109,13 @@ class ConnectionManager:
         """Return list of configured database instances."""
         instances = self._config.get("databases", {}).get("instances", [])
         return [
-            {"name": inst.get("name"), "type": inst.get("type"), "host": inst.get("host")}
+            {
+                "name": inst.get("name"),
+                "type": inst.get("type"),
+                "host": inst.get("host"),
+                "port": inst.get("port"),
+                "database": inst.get("database"),
+            }
             for inst in instances
         ]
 
@@ -121,23 +127,48 @@ class ConnectionManager:
         return None
 
     def _build_connection_url(self, cfg: Dict, readonly: bool) -> str:
-        """Build SQLAlchemy connection URL from instance config."""
+        """Build SQLAlchemy connection URL from instance config.
+
+        Credential resolution order:
+          1. Environment variable (e.g. DBA_PG_TEST_RO_PASS)
+          2. Direct value in config (e.g. readonly_pass: "mypass")
+          3. Empty string (will likely fail at connect time)
+        """
         db_type = cfg.get("type", "").lower()
         host = cfg.get("host", "localhost")
         port = cfg.get("port")
         database = cfg.get("database", "")
 
-        # Use readonly or admin credentials from env vars
-        user_env = cfg.get("readonly_user_env" if readonly else "admin_user_env", "")
-        pass_env = cfg.get("readonly_pass_env" if readonly else "admin_pass_env", "")
-        user = os.environ.get(user_env, cfg.get("readonly_user", ""))
-        password = os.environ.get(pass_env, "")
+        # Resolve credentials: env var first, then direct config value
+        if readonly:
+            user_env = cfg.get("readonly_user_env", "")
+            pass_env = cfg.get("readonly_pass_env", "")
+            user = os.environ.get(user_env, "") if user_env else ""
+            password = os.environ.get(pass_env, "") if pass_env else ""
+            if not user:
+                user = cfg.get("readonly_user", "")
+            if not password:
+                password = cfg.get("readonly_pass", "")
+        else:
+            user_env = cfg.get("admin_user_env", "")
+            pass_env = cfg.get("admin_pass_env", "")
+            user = os.environ.get(user_env, "") if user_env else ""
+            password = os.environ.get(pass_env, "") if pass_env else ""
+            if not user:
+                user = cfg.get("admin_user", "")
+            if not password:
+                password = cfg.get("admin_pass", "")
+
+        # URL-encode special characters in password
+        from urllib.parse import quote_plus
+        safe_password = quote_plus(password) if password else ""
 
         dialect_map = {
-            "mysql": f"mysql+pymysql://{user}:{password}@{host}:{port or 3306}/{database}",
-            "postgresql": f"postgresql+psycopg2://{user}:{password}@{host}:{port or 5432}/{database}",
-            "oracle": f"oracle+cx_oracle://{user}:{password}@{host}:{port or 1521}/{database}",
-            "sqlserver": f"mssql+pyodbc://{user}:{password}@{host}:{port or 1433}/{database}?driver=ODBC+Driver+17+for+SQL+Server",
+            "mysql": f"mysql+pymysql://{user}:{safe_password}@{host}:{port or 3306}/{database}",
+            "postgresql": f"postgresql+psycopg2://{user}:{safe_password}@{host}:{port or 5432}/{database}",
+            "oracle": f"oracle+cx_oracle://{user}:{safe_password}@{host}:{port or 1521}/{database}",
+            "sqlserver": f"mssql+pyodbc://{user}:{safe_password}@{host}:{port or 1433}/{database}?driver=ODBC+Driver+17+for+SQL+Server",
+            "hive": f"hive://{user}:{safe_password}@{host}:{port or 10000}/{database}",
         }
         url = dialect_map.get(db_type)
         if not url:
@@ -157,6 +188,11 @@ class ConnectionManager:
             args["connect_timeout"] = timeout
             if readonly:
                 args["options"] = "-c default_transaction_read_only=on"
+        elif db_type == "hive":
+            # PyHive / hiveserver2 connection args
+            auth = cfg.get("auth", "NONE")
+            if auth and auth != "NONE":
+                args["auth"] = auth
         return args
 
 
@@ -165,6 +201,8 @@ _connection_manager = ConnectionManager()
 
 
 def get_connection_manager() -> ConnectionManager:
+    if not _connection_manager._config:
+        _connection_manager.load_config()
     return _connection_manager
 
 

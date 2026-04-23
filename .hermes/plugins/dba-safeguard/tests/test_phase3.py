@@ -364,48 +364,44 @@ class TestConfigWatcher:
 
 class TestContextInjector:
     def test_injection_adds_system_context(self):
-        import asyncio
         from harnesses.context_injector import pre_llm_call_hook
 
-        messages = [
-            {"role": "user", "content": "SELECT * FROM users"},
-        ]
-        result = asyncio.get_event_loop().run_until_complete(
-            pre_llm_call_hook(messages)
+        result = pre_llm_call_hook(
+            user_message="SELECT * FROM users",
+            conversation_history=[
+                {"role": "user", "content": "SELECT * FROM users"},
+            ],
         )
         assert result is not None
-        # Should have system message prepended
-        assert result[0]["role"] == "system"
-        assert "DBA SafeGuard" in result[0]["content"]
+        # Should return a context dict with DBA system context
+        assert isinstance(result, dict)
+        assert "DBA SafeGuard" in result["context"]
 
     def test_injection_includes_intent(self):
-        import asyncio
         from harnesses.context_injector import pre_llm_call_hook
 
-        messages = [
-            {"role": "user", "content": "DELETE FROM orders WHERE id = 1"},
-        ]
-        result = asyncio.get_event_loop().run_until_complete(
-            pre_llm_call_hook(messages)
+        result = pre_llm_call_hook(
+            user_message="DELETE FROM orders WHERE id = 1",
+            conversation_history=[
+                {"role": "user", "content": "DELETE FROM orders WHERE id = 1"},
+            ],
         )
         assert result is not None
-        system_content = result[0]["content"]
-        assert "意图分析" in system_content
+        assert "意图分析" in result["context"]
 
     def test_injection_preserves_existing_system(self):
-        import asyncio
         from harnesses.context_injector import pre_llm_call_hook
 
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": "SELECT 1"},
-        ]
-        result = asyncio.get_event_loop().run_until_complete(
-            pre_llm_call_hook(messages)
+        result = pre_llm_call_hook(
+            user_message="SELECT 1",
+            conversation_history=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "SELECT 1"},
+            ],
         )
         assert result is not None
-        assert "helpful assistant" in result[0]["content"]
-        assert "DBA SafeGuard" in result[0]["content"]
+        # Context is now returned as a dict, not injected into messages
+        assert "DBA SafeGuard" in result["context"]
 
     def test_sql_intent_detection(self):
         from harnesses.context_injector import _detect_sql_intent

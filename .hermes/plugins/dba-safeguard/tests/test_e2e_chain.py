@@ -2,11 +2,10 @@
 
 需要真实 PostgreSQL 数据库。
 设置环境变量后运行:
-  $env:DBA_PG_TEST_RO_USER="health_user"
-  $env:DBA_PG_TEST_RO_PASS="health_password"
+    $env:DBA_PG_TEST_RO_USER="dbclaw_test_user"
+    $env:DBA_PG_TEST_RO_PASS="dbclaw_test_password"
 """
 
-import asyncio
 import json
 import os
 import sys
@@ -22,10 +21,6 @@ PG_AVAILABLE = bool(
     and os.environ.get("DBA_PG_TEST_RO_PASS")
 )
 pytestmark = pytest.mark.skipif(not PG_AVAILABLE, reason="PG test credentials not set")
-
-
-def _run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
 
 
 @pytest.fixture(scope="module")
@@ -66,9 +61,9 @@ class TestE2ESelectChain:
 
         # 4. Interceptor (should auto-approve L0)
         from harnesses.risk_interceptor import pre_tool_call_hook
-        result = _run(pre_tool_call_hook(
-            "db_execute", {"sql": sql, "dialect": dialect}
-        ))
+        result = pre_tool_call_hook(
+            tool_name="db_execute", args={"sql": sql, "dialect": dialect}
+        )
         assert result is None  # Proceed
 
 
@@ -85,9 +80,9 @@ class TestE2EInsertChain:
         assert val["risk_level"] == 1
 
         from harnesses.risk_interceptor import pre_tool_call_hook
-        result = _run(pre_tool_call_hook(
-            "db_execute", {"sql": sql, "dialect": dialect}
-        ))
+        result = pre_tool_call_hook(
+            tool_name="db_execute", args={"sql": sql, "dialect": dialect}
+        )
         assert result is None  # L1 notify_approve → proceed
 
 
@@ -105,9 +100,9 @@ class TestE2EUpdateChain:
 
         # Interceptor should block (require human confirm)
         from harnesses.risk_interceptor import pre_tool_call_hook
-        result = _run(pre_tool_call_hook(
-            "db_execute", {"sql": sql, "dialect": dialect}
-        ))
+        result = pre_tool_call_hook(
+            tool_name="db_execute", args={"sql": sql, "dialect": dialect}
+        )
         assert result is not None
         assert result["block"] is True
         assert "人工确认" in result["message"]
@@ -117,9 +112,9 @@ class TestE2EUpdateChain:
         dialect = "postgresql"
 
         from harnesses.risk_interceptor import pre_tool_call_hook
-        result = _run(pre_tool_call_hook(
-            "db_execute", {"sql": sql, "dialect": dialect, "approved": True}
-        ))
+        result = pre_tool_call_hook(
+            tool_name="db_execute", args={"sql": sql, "dialect": dialect, "approved": True}
+        )
         assert result is None  # Already approved → proceed
 
 
@@ -136,9 +131,9 @@ class TestE2EDestructiveChain:
         assert any("无WHERE" in w for w in val["warnings"])
 
         from harnesses.risk_interceptor import pre_tool_call_hook
-        result = _run(pre_tool_call_hook(
-            "db_execute", {"sql": sql, "dialect": dialect}
-        ))
+        result = pre_tool_call_hook(
+            tool_name="db_execute", args={"sql": sql, "dialect": dialect}
+        )
         assert result["block"] is True
         assert "阻断" in result["message"]
 
@@ -151,9 +146,9 @@ class TestE2EDestructiveChain:
         assert val["risk_level"] == 4
 
         from harnesses.risk_interceptor import pre_tool_call_hook
-        result = _run(pre_tool_call_hook(
-            "db_execute", {"sql": sql, "dialect": dialect}
-        ))
+        result = pre_tool_call_hook(
+            tool_name="db_execute", args={"sql": sql, "dialect": dialect}
+        )
         assert result["block"] is True
 
 

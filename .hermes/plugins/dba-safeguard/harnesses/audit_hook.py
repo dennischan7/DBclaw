@@ -19,19 +19,26 @@ AUDITABLE_TOOLS = {
 }
 
 
-async def post_tool_call_hook(
-    tool_name: str,
-    tool_args: Dict[str, Any],
-    tool_result: Any,
-    context: Optional[Any] = None,
+def post_tool_call_hook(
+    tool_name: str = "",
+    args: Optional[Dict[str, Any]] = None,
+    result: Any = None,
+    task_id: str = "",
+    session_id: str = "",
+    tool_call_id: str = "",
     **kwargs,
 ) -> None:
     """Hermes post_tool_call hook for audit logging.
 
     Automatically records every DBA tool call to the audit database.
+
+    Hermes passes: tool_name, args, result, task_id, session_id, tool_call_id.
     """
     if tool_name not in AUDITABLE_TOOLS:
         return
+
+    tool_args = args or {}
+    tool_result = result
 
     try:
         from ..tools.audit_logger import log_audit_event
@@ -43,8 +50,8 @@ async def post_tool_call_hook(
 
         try:
             result_data = json.loads(result_str) if isinstance(tool_result, str) else {}
-            error_message = result_data.get("error", "")
-            execution_time = result_data.get("execution_time_ms", 0)
+            error_message = result_data.get("error") or ""
+            execution_time = result_data.get("execution_time_ms") or 0
         except (json.JSONDecodeError, AttributeError):
             pass
 

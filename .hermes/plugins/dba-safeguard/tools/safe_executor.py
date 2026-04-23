@@ -14,12 +14,228 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import time
-from typing import Any, Dict, Optional
+import uuid
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("dba_safeguard.tools.safe_executor")
 
 DEFAULT_EXECUTION_TIMEOUT = 60  # seconds
+DEFAULT_RESULT_PAGE_SIZE = 100
+RESULT_CACHE_TTL_SECONDS = 600
+
+_RESULT_CACHE: Dict[str, Dict[str, Any]] = {}
+_RESULT_CACHE_LOCK = threading.Lock()
+
+
+def _row_to_list(row: Any) -> List[Any]:
+    return list(row)
+
+
+def _close_result_cache_entry(entry: Dict[str, Any]) -> None:
+    result = entry.get("result")
+    connection = entry.get("connection")
+    try:
+        if result is not None:
+            result.close()
+    except Exception:
+        pass
+    try:
+        if connection is not None:
+            connection.close()
+    except Exception:
+        pass
+    entry["result"] = None
+    entry["connection"] = None
+
+
+def _prune_expired_result_cache(now: Optional[float] = None) -> None:
+    now = now or time.time()
+    expired_ids: List[str] = []
+    with _RESULT_CACHE_LOCK:
+        for result_set_id, entry in _RESULT_CACHE.items():
+            if now - entry.get("created_at", now) > RESULT_CACHE_TTL_SECONDS:
+                expired_ids.append(result_set_id)
+        for result_set_id in expired_ids:
+            entry = _RESULT_CACHE.pop(result_set_id, None)
+            if entry is not None:
+                _close_result_cache_entry(entry)
+
+
+def bind_result_cache_owner(
+    result_set_id: str,
+    *,
+    conversation_id: str = "",
+    user_id: str = "",
+) -> bool:
+    if not result_set_id:
+        return False
+    _prune_expired_result_cache()
+    with _RESULT_CACHE_LOCK:
+        entry = _RESULT_CACHE.get(result_set_id)
+        if entry is None:
+            return False
+        if conversation_id:
+            entry["conversation_id"] = conversation_id
+        if user_id:
+            entry["user_id"] = user_id
+        return True
+
+
+def _entry_has_more(entry: Dict[str, Any], next_offset: int) -> bool:
+    if entry.get("loaded_count", 0) > next_offset:
+        return True
+    return not entry.get("exhausted", True)
+
+
+def fetch_result_page(
+    result_set_id: str,
+    *,
+    offset: int = 0,
+    limit: int = DEFAULT_RESULT_PAGE_SIZE,
+    conversation_id: str = "",
+    user_id: str = "",
+) -> Dict[str, Any]:
+    _prune_expired_result_cache()
+    limit = max(1, min(int(limit), DEFAULT_RESULT_PAGE_SIZE))
+    offset = max(0, int(offset))
+
+    with _RESULT_CACHE_LOCK:
+        entry = _RESULT_CACHE.get(result_set_id)
+
+    if entry is None:
+        return {"error": "结果集不存在或已过期"}
+
+    entry_conversation_id = entry.get("conversation_id") or ""
+    entry_user_id = entry.get("user_id") or ""
+    if conversation_id and entry_conversation_id and conversation_id != entry_conversation_id:
+        return {"error": "无权访问该结果集"}
+    if user_id and entry_user_id and user_id != entry_user_id:
+        return {"error": "无权访问该结果集"}
+
+    with entry["lock"]:
+        pages = entry["pages"]
+        page_rows = pages.get(offset)
+        if page_rows is None:
+            if offset != entry.get("loaded_count", 0):
+                return {"error": "结果集仅支持顺序加载下一批数据"}
+
+            if entry.get("exhausted", False):
+                return {
+                    "result_set_id": result_set_id,
+                    "columns": entry.get("columns", []),
+                    "rows": [],
+                    "offset": offset,
+                    "limit": limit,
+                    "loaded_count": entry.get("loaded_count", 0),
+                    "page_size": entry.get("page_size", DEFAULT_RESULT_PAGE_SIZE),
+                    "has_more": False,
+                }
+
+            page_rows = []
+            buffered_rows = entry["buffered_rows"]
+            while buffered_rows and len(page_rows) < limit:
+                page_rows.append(buffered_rows.pop(0))
+
+            while len(page_rows) < limit and not entry.get("exhausted", False):
+                result = entry.get("result")
+                if result is None:
+                    entry["exhausted"] = True
+                    break
+                fetched = result.fetchmany(limit - len(page_rows))
+                if not fetched:
+                    entry["exhausted"] = True
+                    _close_result_cache_entry(entry)
+                    break
+                page_rows.extend(_row_to_list(row) for row in fetched)
+
+            if page_rows:
+                pages[offset] = page_rows
+                entry["loaded_count"] = max(entry.get("loaded_count", 0), offset + len(page_rows))
+
+            if not entry.get("exhausted", False) and not entry["buffered_rows"]:
+                result = entry.get("result")
+                if result is None:
+                    entry["exhausted"] = True
+                else:
+                    peek = result.fetchmany(1)
+                    if peek:
+                        entry["buffered_rows"].extend(_row_to_list(row) for row in peek)
+                    else:
+                        entry["exhausted"] = True
+                        _close_result_cache_entry(entry)
+
+        next_offset = offset + len(page_rows)
+        payload: Dict[str, Any] = {
+            "result_set_id": result_set_id,
+            "columns": entry.get("columns", []),
+            "rows": page_rows,
+            "offset": offset,
+            "limit": limit,
+            "loaded_count": entry.get("loaded_count", 0),
+            "page_size": entry.get("page_size", DEFAULT_RESULT_PAGE_SIZE),
+            "has_more": _entry_has_more(entry, next_offset),
+        }
+        if entry.get("exhausted", False):
+            payload["total_rows"] = entry.get("loaded_count", 0)
+        return payload
+
+
+def _build_result_preview(
+    rs: Any,
+    conn: Any,
+    *,
+    task_id: str,
+    session_id: str,
+    user_id: str,
+) -> Dict[str, Any]:
+    columns = list(rs.keys()) if hasattr(rs, "keys") else []
+    preview_rows = [_row_to_list(row) for row in rs.fetchmany(DEFAULT_RESULT_PAGE_SIZE)]
+    buffered_rows = [_row_to_list(row) for row in rs.fetchmany(1)]
+    has_more = bool(buffered_rows)
+
+    data: Dict[str, Any] = {
+        "columns": columns,
+        "rows": preview_rows,
+        "page_size": DEFAULT_RESULT_PAGE_SIZE,
+        "loaded_count": len(preview_rows),
+        "has_more": has_more,
+        "preview_limited": has_more,
+    }
+
+    if not has_more:
+        data["total_rows"] = len(preview_rows)
+        try:
+            rs.close()
+        finally:
+            conn.close()
+        return data
+
+    result_set_id = task_id or f"result_{uuid.uuid4().hex}"
+    entry = {
+        "created_at": time.time(),
+        "result": rs,
+        "connection": conn,
+        "columns": columns,
+        "page_size": DEFAULT_RESULT_PAGE_SIZE,
+        "pages": {0: preview_rows},
+        "loaded_count": len(preview_rows),
+        "buffered_rows": buffered_rows,
+        "exhausted": False,
+        "session_id": session_id,
+        "user_id": user_id,
+        "conversation_id": "",
+        "lock": threading.Lock(),
+    }
+    with _RESULT_CACHE_LOCK:
+        old_entry = _RESULT_CACHE.pop(result_set_id, None)
+        if old_entry is not None:
+            _close_result_cache_entry(old_entry)
+        _RESULT_CACHE[result_set_id] = entry
+
+    data["result_set_id"] = result_set_id
+    return data
 
 
 def execute_sql(
@@ -81,20 +297,25 @@ def execute_sql(
 
         start = time.time()
 
-        with engine.connect() as conn:
-            # Set statement timeout
-            _set_statement_timeout(conn, dialect, timeout)
+        if risk_level >= 1:
+            with engine.connect() as conn:
+                # Set statement timeout
+                _set_statement_timeout(conn, dialect, timeout)
 
-            # L2+ UPDATE/DELETE: snapshot affected rows before execution
-            if snapshot and risk_level >= 2:
-                snapshot_data = _snapshot_affected_rows(conn, sql, dialect)
-                if snapshot_data is not None:
-                    result["snapshot_rows"] = snapshot_data
+                # L2+ UPDATE/DELETE: snapshot affected rows before execution
+                if snapshot and risk_level >= 2:
+                    snapshot_data = _snapshot_affected_rows(conn, sql, dialect)
+                    if snapshot_data is not None:
+                        result["snapshot_rows"] = snapshot_data
 
-            # Execute in transaction
-            if risk_level >= 1:
                 # Explicit transaction for write operations
-                trans = conn.begin()
+                # SQLAlchemy 2.x: use conn.begin() as context manager
+                # If autobegin is active, commit/rollback the implicit txn first
+                try:
+                    trans = conn.begin()
+                except Exception:
+                    # Already in a transaction (autobegin) — use it directly
+                    trans = None
                 try:
                     rs = conn.execute(text(sql))
                     if rs.returns_rows:
@@ -102,30 +323,42 @@ def execute_sql(
                         columns = list(rs.keys()) if hasattr(rs, "keys") else []
                         result["data"] = {
                             "columns": columns,
-                            "rows": [list(r) for r in rows[:1000]],
+                            "rows": [_row_to_list(r) for r in rows[:1000]],
                             "total_rows": len(rows),
                         }
                         if len(rows) > 1000:
                             result["data"]["truncated"] = True
                     else:
                         result["rows_affected"] = rs.rowcount
-                    trans.commit()
+                    if trans is not None:
+                        trans.commit()
+                    else:
+                        conn.commit()
                 except Exception:
-                    trans.rollback()
+                    if trans is not None:
+                        trans.rollback()
+                    else:
+                        conn.rollback()
                     raise
-            else:
-                # L0 read-only — no transaction needed
+        else:
+            conn = engine.connect()
+            try:
+                _set_statement_timeout(conn, dialect, timeout)
                 rs = conn.execute(text(sql))
                 if rs.returns_rows:
-                    rows = rs.fetchall()
-                    columns = list(rs.keys()) if hasattr(rs, "keys") else []
-                    result["data"] = {
-                        "columns": columns,
-                        "rows": [list(r) for r in rows[:1000]],
-                        "total_rows": len(rows),
-                    }
-                    if len(rows) > 1000:
-                        result["data"]["truncated"] = True
+                    result["data"] = _build_result_preview(
+                        rs,
+                        conn,
+                        task_id=task_id,
+                        session_id=session_id,
+                        user_id=user_id,
+                    )
+                    conn = None
+                else:
+                    result["rows_affected"] = rs.rowcount
+            finally:
+                if conn is not None:
+                    conn.close()
 
         result["execution_time_ms"] = int((time.time() - start) * 1000)
         result["success"] = True

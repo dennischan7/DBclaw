@@ -3,12 +3,12 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hermes-agent"
-version = "0.9.0"
-description = "The self-improving AI agent — creates skills from experience, improves them during use, and runs anywhere"
+name = "dbclaw"
+version = "0.1.0"
+description = "DBclaw is a database expert system built on the Hermes architecture, adding document-grounded SQL generation, safety pipelines, auditability, approvals, rollback, and DBA-focused WebUI workflows."
 readme = "README.md"
 requires-python = ">=3.11"
-authors = [{ name = "Nous Research" }]
+authors = [{ name = "DBclaw Contributors" }]
 license = { text = "MIT" }
 dependencies = [
   # Core — pinned to known-good ranges to limit supply chain attack surface
@@ -67,12 +67,12 @@ termux = [
   # Tested Android / Termux path: keeps the core CLI feature-rich while
   # avoiding extras that currently depend on non-Android wheels (notably
   # faster-whisper -> ctranslate2 via the voice extra).
-  "hermes-agent[cron]",
-  "hermes-agent[cli]",
-  "hermes-agent[pty]",
-  "hermes-agent[mcp]",
-  "hermes-agent[honcho]",
-  "hermes-agent[acp]",
+  "dbclaw[cron]",
+  "dbclaw[cli]",
+  "dbclaw[pty]",
+  "dbclaw[mcp]",
+  "dbclaw[honcho]",
+  "dbclaw[acp]",
 ]
 dingtalk = ["dingtalk-stream>=0.1.0,<1"]
 feishu = ["lark-oapi>=1.5.3,<2"]
@@ -83,6 +83,7 @@ dba = [
   "psycopg2-binary>=2.9.0,<3",
   "cx_Oracle>=8.3.0,<9",
   "pyodbc>=5.0.0,<6",
+  "pyhive[hive_pure_sasl]>=0.7.0,<1",
 ]
 web = ["fastapi>=0.104.0,<1", "uvicorn[standard]>=0.24.0,<1"]
 rl = [
@@ -94,32 +95,33 @@ rl = [
 ]
 yc-bench = ["yc-bench @ git+https://github.com/collinear-ai/yc-bench.git ; python_version >= '3.12'"]
 all = [
-  "hermes-agent[modal]",
-  "hermes-agent[daytona]",
-  "hermes-agent[messaging]",
+  "dbclaw[modal]",
+  "dbclaw[daytona]",
+  "dbclaw[messaging]",
   # matrix: python-olm (required by matrix-nio[e2e]) is upstream-broken on
   # modern macOS (archived libolm, C++ errors with Clang 21+).  On Linux the
   # [matrix] extra's own marker pulls in the [e2e] variant automatically.
-  "hermes-agent[matrix]; sys_platform == 'linux'",
-  "hermes-agent[cron]",
-  "hermes-agent[cli]",
-  "hermes-agent[dev]",
-  "hermes-agent[tts-premium]",
-  "hermes-agent[slack]",
-  "hermes-agent[pty]",
-  "hermes-agent[honcho]",
-  "hermes-agent[mcp]",
-  "hermes-agent[homeassistant]",
-  "hermes-agent[sms]",
-  "hermes-agent[acp]",
-  "hermes-agent[voice]",
-  "hermes-agent[dingtalk]",
-  "hermes-agent[feishu]",
-  "hermes-agent[mistral]",
-  "hermes-agent[web]",
+  "dbclaw[matrix]; sys_platform == 'linux'",
+  "dbclaw[cron]",
+  "dbclaw[cli]",
+  "dbclaw[dev]",
+  "dbclaw[tts-premium]",
+  "dbclaw[slack]",
+  "dbclaw[pty]",
+  "dbclaw[honcho]",
+  "dbclaw[mcp]",
+  "dbclaw[homeassistant]",
+  "dbclaw[sms]",
+  "dbclaw[acp]",
+  "dbclaw[voice]",
+  "dbclaw[dingtalk]",
+  "dbclaw[feishu]",
+  "dbclaw[mistral]",
+  "dbclaw[web]",
 ]
 
 [project.scripts]
+dbclaw = "hermes_cli.main:main"
 hermes = "hermes_cli.main:main"
 hermes-agent = "run_agent:main"
 hermes-acp = "acp_adapter.entry:main"

@@ -181,8 +181,41 @@ keyword_rules:
     intent: "ddl_truncate"
     confidence: 0.95
 
-  # 自然语言关键词 (较低置信度)
-  - patterns: ["索引优化", "查询优化", "慢查询", "执行计划", "optimize", "slow query", "performance"]
+  # 自然语言关键词 — 中文 (较低置信度)
+  - patterns: ["查询.*表", "(?<!排)查一下", "查看.*数据", "查.*记录", "看看.*表", "帮我查[^排]", "帮我查$", "有多少条", "有多少行"]
+    intent: "query"
+    confidence: 0.75
+
+  - patterns: ["插入.*记录", "插入.*数据", "新增.*行", "添加.*记录", "加一条", "写入.*数据"]
+    intent: "dml_insert"
+    confidence: 0.75
+
+  - patterns: ["更新.*表", "修改.*数据", "改成", "改为", "把.*改", "更新.*set", "update.*表"]
+    intent: "dml_update"
+    confidence: 0.75
+
+  - patterns: ["删除.*记录", "删除.*数据", "删掉.*行", "移除.*数据", "清除.*记录"]
+    intent: "dml_delete"
+    confidence: 0.75
+
+  - patterns: ["添加.*字段", "添加.*列", "新增.*列", "加个.*字段", "加一列"]
+    intent: "ddl_alter"
+    confidence: 0.75
+
+  - patterns: ["创建.*表", "建.*表", "新建.*表", "create.*table"]
+    intent: "ddl_create"
+    confidence: 0.75
+
+  - patterns: ["删除[^中]*表$", "删除.*表[^中]", "删表", "drop.*table", "丢弃.*表"]
+    intent: "ddl_drop"
+    confidence: 0.80
+
+  - patterns: ["清空.*表", "截断.*表", "truncate"]
+    intent: "ddl_truncate"
+    confidence: 0.75
+
+  # 自然语言关键词 — 运维 (较低置信度)
+  - patterns: ["索引优化", "查询优化", "慢查询", "执行计划", "optimize", "slow query", "performance", "优化.*索引", "分析.*性能"]
     intent: "optimize"
     confidence: 0.7
 
@@ -194,9 +227,9 @@ keyword_rules:
     intent: "backup_restore"
     confidence: 0.7
 
-  - patterns: ["死锁", "锁等待", "deadlock", "lock wait", "排查", "troubleshoot"]
+  - patterns: ["死锁", "锁等待", "deadlock", "lock wait", "排查", "troubleshoot", "连接超时", "故障", "报错", "异常", "挂了"]
     intent: "troubleshoot"
-    confidence: 0.7
+    confidence: 0.75
 
 # ============================================================
 # 数据库类型识别规则

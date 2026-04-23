@@ -66,7 +66,7 @@ def run_preflight(
 
     # 3. Permission check (based on SQL operation type)
     if not failures:
-        perm_result = _check_permissions(sql, dialect)
+        perm_result = _check_permissions(sql, dialect, instance_name=instance_name)
         checks.append(perm_result)
         if not perm_result["passed"]:
             failures.append({"name": perm_result["name"],
@@ -176,7 +176,7 @@ def _check_tables_exist(
         }
 
 
-def _check_permissions(sql: str, dialect: str) -> Dict[str, Any]:
+def _check_permissions(sql: str, dialect: str, instance_name: str = "") -> Dict[str, Any]:
     """Check if the operation type is compatible with available connections.
 
     Verifies that write operations have admin credentials configured.
@@ -200,6 +200,27 @@ def _check_permissions(sql: str, dialect: str) -> Dict[str, Any]:
     admin_user = os.environ.get("DBA_PG_TEST_ADMIN_USER", "")
     if not admin_user:
         admin_user = os.environ.get("DBA_ADMIN_USER", "")
+
+    # YAML fallback: read admin_user directly from dba_config.yaml for the given instance
+    if not admin_user and instance_name:
+        try:
+            import yaml
+            from pathlib import Path
+            config_path = Path(__file__).parent.parent / "config" / "dba_config.yaml"
+            if config_path.exists():
+                with open(config_path, "r", encoding="utf-8") as f:
+                    cfg = yaml.safe_load(f) or {}
+                for inst in cfg.get("databases", {}).get("instances", []):
+                    if inst.get("name") == instance_name:
+                        # Direct value takes priority over env-var indirection
+                        admin_user = inst.get("admin_user", "")
+                        if not admin_user:
+                            env_key = inst.get("admin_user_env", "")
+                            if env_key:
+                                admin_user = os.environ.get(env_key, "")
+                        break
+        except Exception:
+            pass
 
     if not admin_user:
         return {

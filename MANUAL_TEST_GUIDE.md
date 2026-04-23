@@ -15,8 +15,8 @@ docker start ent-health-postgres-kimi
 
 # 或首次创建
 docker run -d --name ent-health-postgres-kimi \
-  -e POSTGRES_USER=health_user \
-  -e POSTGRES_PASSWORD=health_password \
+  -e POSTGRES_USER=dbclaw_test_user \
+  -e POSTGRES_PASSWORD=dbclaw_test_password \
   -e POSTGRES_DB=health_db_kimi \
   -p 5437:5432 \
   postgres:15
@@ -29,18 +29,18 @@ docker ps --filter name=ent-health-postgres-kimi   # Status: Up ... (healthy)
 
 ```bash
 # Windows PowerShell
-$env:DBA_PG_TEST_RO_USER = "health_user"
-$env:DBA_PG_TEST_RO_PASS = "health_password"
-$env:DBA_PG_TEST_ADMIN_USER = "health_user"
-$env:DBA_PG_TEST_ADMIN_PASS = "health_password"
+$env:DBA_PG_TEST_RO_USER = "dbclaw_test_user"
+$env:DBA_PG_TEST_RO_PASS = "dbclaw_test_password"
+$env:DBA_PG_TEST_ADMIN_USER = "dbclaw_test_user"
+$env:DBA_PG_TEST_ADMIN_PASS = "dbclaw_test_password"
 $env:DBA_SAFEGUARD_ENABLED = "true"
 $env:HERMES_ENABLE_PROJECT_PLUGINS = "true"
 
 # Linux/macOS
-export DBA_PG_TEST_RO_USER=health_user
-export DBA_PG_TEST_RO_PASS=health_password
-export DBA_PG_TEST_ADMIN_USER=health_user
-export DBA_PG_TEST_ADMIN_PASS=health_password
+export DBA_PG_TEST_RO_USER=dbclaw_test_user
+export DBA_PG_TEST_RO_PASS=dbclaw_test_password
+export DBA_PG_TEST_ADMIN_USER=dbclaw_test_user
+export DBA_PG_TEST_ADMIN_PASS=dbclaw_test_password
 ```
 
 ### 0.3 运行自动化测试（基线对照）
@@ -54,7 +54,7 @@ python -m pytest .hermes/plugins/dba-safeguard/tests/ -v -o "addopts=" --tb=shor
 ### 0.4 准备测试表
 
 ```sql
--- 连接 PG (psql -h localhost -p 5437 -U health_user -d health_db_kimi)
+-- 连接 PG (psql -h localhost -p 5437 -U dbclaw_test_user -d health_db_kimi)
 CREATE TABLE IF NOT EXISTS test_manual (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100),

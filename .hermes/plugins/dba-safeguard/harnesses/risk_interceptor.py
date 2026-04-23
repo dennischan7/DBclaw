@@ -28,7 +28,7 @@ def load_hitl_matrix() -> Dict[str, Any]:
         return _default_matrix()
     try:
         import yaml
-        with open(matrix_path) as f:
+        with open(matrix_path, encoding="utf-8") as f:
             return yaml.safe_load(f) or _default_matrix()
     except Exception as e:
         logger.error("Failed to load HITL matrix: %s", e)
@@ -48,10 +48,12 @@ def _default_matrix() -> Dict[str, Any]:
     }
 
 
-async def pre_tool_call_hook(
-    tool_name: str,
-    tool_args: Dict[str, Any],
-    context: Optional[Any] = None,
+def pre_tool_call_hook(
+    tool_name: str = "",
+    args: Optional[Dict[str, Any]] = None,
+    task_id: str = "",
+    session_id: str = "",
+    tool_call_id: str = "",
     **kwargs,
 ) -> Optional[Dict[str, Any]]:
     """Hermes pre_tool_call hook for risk interception.
@@ -62,10 +64,14 @@ async def pre_tool_call_hook(
       - Apply HITL matrix rules
       - Block, approve, or request human confirmation
 
+    Hermes passes: tool_name, args, task_id, session_id, tool_call_id.
+
     Returns:
         None to proceed normally, or a dict with {"block": True, "message": str}
         to prevent tool execution.
     """
+    tool_args = args or {}
+
     # Only intercept db_execute tool
     if tool_name != "db_execute":
         return None

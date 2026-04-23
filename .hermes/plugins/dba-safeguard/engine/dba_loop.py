@@ -595,10 +595,13 @@ def run_pipeline(
     *,
     task_id: str = "",
     user_message: str = "",
+    user_id: str = "default",
+    session_id: str = "",
     on_approval_needed: Optional[Callable] = None,
 ) -> DBATask:
     """One-shot pipeline execution."""
     task = create_task(sql, instance_name, dialect,
-                       task_id=task_id, user_message=user_message)
+                       task_id=task_id, user_message=user_message,
+                       user_id=user_id, session_id=session_id)
     pipeline = DBAPipeline(on_approval_needed=on_approval_needed)
     return pipeline.run(task)

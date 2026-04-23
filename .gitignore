@@ -58,6 +58,14 @@ hermes_cli/web_dist/
 .release_notes.md
 mini-swe-agent/
 
+# Runtime SQLite artifacts
+webui/chat_history.db
+artifacts/audit/audit.db
+artifacts/audit/*.db
+artifacts/audit/*.db-*
+artifacts/audit/*.sqlite
+artifacts/audit/*.sqlite-*
+
 # Nix
 .direnv/
 result

@@ -1,16 +1,16 @@
 name: "🐛 Bug Report"
-description: Report a bug — something that's broken, crashes, or behaves incorrectly.
+description: Report a DBclaw bug — crash, incorrect behavior, release regression, or security issue.
 title: "[Bug]: "
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting a bug! Please fill out the sections below so we can reproduce and fix it quickly.
+        Thanks for reporting a DBclaw bug. Please fill out the sections below so we can reproduce and fix it quickly.
 
         **Before submitting**, please:
-        - [ ] Search [existing issues](https://github.com/NousResearch/hermes-agent/issues) to avoid duplicates
-        - [ ] Update to the latest version (`hermes update`) and confirm the bug still exists
+        - [ ] Search existing issues to avoid duplicates
+        - [ ] Confirm the bug still exists on the latest `v0.1.x` code or release tag
 
   - type: textarea
     id: description
@@ -55,16 +55,19 @@ body:
     id: component
     attributes:
       label: Affected Component
-      description: Which part of Hermes is affected?
+      description: Which part of DBclaw is affected?
       multiple: true
       options:
-        - CLI (interactive chat)
-        - Gateway (Telegram/Discord/Slack/WhatsApp)
+        - WebUI
+        - DBA SafeGuard plugin
+        - SQL generation / intent routing
+        - Safety pipeline / risk control
+        - Approval / audit / rollback
+        - Memory / RAG / skills
+        - CLI / local commands
         - Setup / Installation
-        - Tools (terminal, file ops, web, code execution, etc.)
-        - Skills (skill loading, skill hub, skill guard)
-        - Agent Core (conversation loop, context compression, memory)
-        - Configuration (config.yaml, .env, hermes setup)
+        - Configuration (dba_config.yaml, .env, instance settings)
+        - Security / secret handling
         - Other
     validations:
       required: true
@@ -73,7 +76,7 @@ body:
     id: platform
     attributes:
       label: Messaging Platform (if gateway-related)
-      description: Which platform adapter is affected?
+      description: If your bug is gateway-related, select the affected platform.
       multiple: true
       options:
         - N/A (CLI only)
@@ -103,11 +106,19 @@ body:
   - type: input
     id: hermes-version
     attributes:
-      label: Hermes Version
-      description: Output of `hermes version`
-      placeholder: "2.1.0"
+      label: DBclaw Version
+      description: Release tag, branch, or commit SHA
+      placeholder: "v0.1.0"
     validations:
       required: true
+
+  - type: textarea
+    id: security-impact
+    attributes:
+      label: Security Impact (optional)
+      description: If the bug may expose credentials, bypass approvals, or allow dangerous SQL, explain that here.
+      placeholder: |
+        Example: This bypasses approval checks for UPDATE statements in moderate mode.
 
   - type: textarea
     id: logs

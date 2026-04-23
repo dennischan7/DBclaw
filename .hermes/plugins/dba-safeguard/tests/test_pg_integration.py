@@ -6,10 +6,10 @@
   - metadata_reader: tables / columns / indexes / ddl (PG 新增功能)
 
 运行前:
-  $env:DBA_PG_TEST_RO_USER="health_user"
-  $env:DBA_PG_TEST_RO_PASS="health_password"
-  $env:DBA_PG_TEST_ADMIN_USER="health_user"
-  $env:DBA_PG_TEST_ADMIN_PASS="health_password"
+    $env:DBA_PG_TEST_RO_USER="dbclaw_test_user"
+    $env:DBA_PG_TEST_RO_PASS="dbclaw_test_password"
+    $env:DBA_PG_TEST_ADMIN_USER="dbclaw_test_user"
+    $env:DBA_PG_TEST_ADMIN_PASS="dbclaw_test_password"
 """
 
 import json

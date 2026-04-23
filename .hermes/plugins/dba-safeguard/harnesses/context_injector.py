@@ -36,19 +36,28 @@ DDL:  sql_validate → rollback_generate → [管理员审批] → db_execute
 """
 
 
-async def pre_llm_call_hook(
-    messages: List[Dict[str, Any]],
-    context: Optional[Any] = None,
+def pre_llm_call_hook(
+    user_message: str = "",
+    conversation_history: Optional[List[Dict[str, Any]]] = None,
+    session_id: str = "",
+    is_first_turn: bool = False,
+    model: str = "",
+    platform: str = "",
+    sender_id: str = "",
     **kwargs,
-) -> Optional[List[Dict[str, Any]]]:
+) -> Optional[Dict[str, str]]:
     """Hermes pre_llm_call hook for context injection.
 
     Injects DBA system context, active connection info, and relevant
-    library snippets into the messages before LLM processing.
+    library snippets as context into the user message.
+
+    Hermes passes: session_id, user_message, conversation_history,
+    is_first_turn, model, platform, sender_id.
 
     Returns:
-        Modified messages list, or None to keep original.
+        {"context": "..."} to inject into user message, or None.
     """
+    messages = conversation_history or []
     injections = []
 
     # 1. DBA system context
@@ -61,14 +70,20 @@ async def pre_llm_call_hook(
         instances = mgr.list_instances()
         if instances:
             conn_info = "\n## 当前可用数据库实例\n"
+            conn_info += "使用 `db_connect` 时请传入 **instance_name**（即 name 字段），而非 database 名。\n"
             for inst in instances:
-                conn_info += f"- **{inst['name']}** ({inst['type']}) @ {inst['host']}\n"
+                parts = [f"**{inst['name']}** ({inst['type']}) @ {inst['host']}"]
+                if inst.get('port'):
+                    parts[0] += f":{inst['port']}"
+                if inst.get('database'):
+                    parts.append(f"database=`{inst['database']}`")
+                conn_info += f"- {', '.join(parts)}\n"
             injections.append(conn_info)
     except Exception:
         pass
 
     # 3. Classify intent and mount relevant harness specs
-    user_msg = _get_last_user_message(messages)
+    user_msg = user_message or _get_last_user_message(messages)
     if user_msg:
         try:
             from .intent_router import classify_intent, get_routing_context
@@ -121,23 +136,10 @@ async def pre_llm_call_hook(
     if not injections:
         return None
 
-    # Inject as a system-level context block
+    # Return context dict — Hermes injects it into the user message,
+    # preserving the system prompt cache prefix.
     injection_text = "\n".join(injections)
-
-    # Prepend to messages as a system instruction
-    modified = list(messages)
-    # Find the first system message and append to it, or insert new one
-    for i, msg in enumerate(modified):
-        if msg.get("role") == "system":
-            modified[i] = {
-                **msg,
-                "content": msg.get("content", "") + "\n\n" + injection_text,
-            }
-            return modified
-
-    # No system message found — insert one at the beginning
-    modified.insert(0, {"role": "system", "content": injection_text})
-    return modified
+    return {"context": injection_text}
 
 
 def _get_last_user_message(messages: List[Dict]) -> str:

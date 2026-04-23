@@ -1,0 +1,1501 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DBA SafeGuard</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- SSE Connection Bar (hidden by default, shown on disconnect) -->
+<div id="connectionBar" class="dba-connection-bar">
+    ⚠ 连接已断开，正在重连…
+</div>
+
+<!-- Toast Notification Container -->
+<div id="toastContainer" class="toast-container"></div>
+
+<!-- Three-Column Layout -->
+<div class="dba-app">
+
+    <!-- ========== LEFT: Sidebar ========== -->
+    <aside class="dba-sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-brand">
+                <div class="sidebar-brand-icon">S</div>
+                <span class="sidebar-brand-text">SafeGuard</span>
+            </div>
+            <button class="icon-btn" id="btnThemeToggle" title="切换主题">
+                🌙
+            </button>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="sidebar-nav-item active" data-panel="chat">
+                <span class="nav-icon">💬</span>
+                <span>SQL 对话</span>
+            </div>
+            <div class="sidebar-nav-item" data-panel="dashboard">
+                <span class="nav-icon">📊</span>
+                <span>仪表盘</span>
+            </div>
+            <div class="sidebar-nav-item" data-panel="approvals">
+                <span class="nav-icon">✅</span>
+                <span>审批队列</span>
+                <span class="nav-badge hidden" id="approvalBadge">0</span>
+            </div>
+            <div class="sidebar-nav-item" data-panel="audit">
+                <span class="nav-icon">📋</span>
+                <span>审计日志</span>
+            </div>
+            <div class="sidebar-nav-item" data-panel="admin">
+                <span class="nav-icon">⚙️</span>
+                <span>管理</span>
+            </div>
+        </nav>
+
+        <!-- Session History -->
+        <div class="sidebar-sessions">
+            <div class="sidebar-sessions-header">
+                <span>最近会话</span>
+                <button class="icon-btn btn-xs" title="新建会话" id="btnNewSession">+</button>
+            </div>
+            <div class="sidebar-search">
+                <input type="text" placeholder="搜索会话…" id="sessionSearch">
+            </div>
+            <div id="sessionList">
+                <!-- Populated by dba_panels.js -->
+            </div>
+        </div>
+
+        <!-- Footer: Instance & Mode -->
+        <div class="sidebar-footer">
+            <div class="sidebar-instance-selector" id="instanceSelector">
+                <span class="sidebar-instance-dot" id="instanceDot"></span>
+                <select id="instanceSelect" class="sidebar-instance-select" title="切换数据库实例">
+                    <option value="pg_test">pg_test</option>
+                </select>
+            </div>
+            <div class="sidebar-mode-display">
+                <span>模式:</span>
+                <span class="mode-badge mode-2" id="modeBadge">MODERATE</span>
+            </div>
+            <div class="sidebar-version text-xs text-dimmed">
+                DBA SafeGuard WebUI v0.1
+            </div>
+        </div>
+    </aside>
+
+    <!-- ========== CENTER: Main Content ========== -->
+    <main class="dba-main">
+
+        <!-- Main Header -->
+        <div class="main-header">
+            <h1 class="main-header-title" id="mainTitle">SQL 对话</h1>
+            <div class="main-header-actions">
+                <button class="icon-btn" id="btnToggleContext" title="切换右侧面板">☰</button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+
+            <!-- === Chat Panel === -->
+            <div class="tab-panel active" id="panel-chat">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="chat-msg assistant">
+                        <div class="chat-msg-content text-muted">
+                            欢迎使用 DBA SafeGuard。输入 SQL 或自然语言查询开始操作。<br>
+                            <span class="text-xs text-dimmed">所有操作经过安全流水线：意图分类 → 风险评估 → SQL验证 → 审批 → 执行 → 审计</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Quick Mode Switch Bar -->
+                <div class="chat-mode-bar" id="chatModeBar">
+                    <span class="chat-mode-label">安全模式:</span>
+                    <button class="chat-mode-btn" data-mode="0" title="只读模式 — 仅允许SELECT">🔒 只读</button>
+                    <button class="chat-mode-btn" data-mode="1" title="保守模式 — 允许低风险写入">🛡️ 保守</button>
+                    <button class="chat-mode-btn active" data-mode="2" title="适中模式 — 允许中等风险操作">⚖️ 适中</button>
+                    <button class="chat-mode-btn" data-mode="3" title="激进模式 — 允许高风险操作">⚡ 激进</button>
+                    <button class="chat-mode-btn" data-mode="4" title="疯狂模式 — 无限制">🔥 疯狂</button>
+                    <span class="chat-mode-lock text-dimmed" id="chatModeLockIcon" style="display:none">🔐 已锁定</span>
+                </div>
+                <div class="chat-input-area">
+                    <div class="chat-input-wrapper">
+                        <textarea id="chatInput" rows="1"
+                            placeholder="输入 SQL 语句或自然语言 (Shift+Enter 换行, Enter 发送)"></textarea>
+                        <div class="chat-input-actions">
+                            <button class="btn btn-primary btn-sm" id="btnSendChat">
+                                <span class="spinner"></span>
+                                <span class="btn-text">发送</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- === Dashboard Panel === -->
+            <div class="tab-panel" id="panel-dashboard">
+                <!-- Stats Row -->
+                <div class="dashboard-grid">
+                    <div class="stat-card">
+                        <div class="stat-card-label">今日操作</div>
+                        <div class="stat-card-value" id="statOpsToday">--</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-label">待审批</div>
+                        <div class="stat-card-value" id="statPendingApprovals">--</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-label">拦截率</div>
+                        <div class="stat-card-value" id="statBlockRate">--</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-label">风险指数</div>
+                        <div class="stat-card-value" id="statRiskIndex">--</div>
+                    </div>
+                </div>
+                <!-- Charts Row -->
+                <div class="dashboard-charts">
+                    <div class="chart-container">
+                        <div class="chart-title">
+                            <span>操作趋势</span>
+                            <div class="chart-tabs">
+                                <span class="chart-tab active" data-range="24h">24h</span>
+                                <span class="chart-tab" data-range="7d">7d</span>
+                                <span class="chart-tab" data-range="30d">30d</span>
+                            </div>
+                        </div>
+                        <canvas id="chartOps" height="200"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">风险分布</div>
+                        <canvas id="chartRisk" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- === Approvals Panel === -->
+            <div class="tab-panel" id="panel-approvals">
+                <div class="filter-bar">
+                    <div class="filter-group">
+                        <label>状态</label>
+                        <select id="approvalFilterStatus" class="form-select" style="width:auto">
+                            <option value="">全部</option>
+                            <option value="pending" selected>待审批</option>
+                            <option value="approved">已通过</option>
+                            <option value="rejected">已驳回</option>
+                            <option value="modified">已修改</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>风险</label>
+                        <select id="approvalFilterRisk" class="form-select" style="width:auto">
+                            <option value="">全部</option>
+                            <option value="0">L0</option>
+                            <option value="1">L1</option>
+                            <option value="2">L2</option>
+                            <option value="3">L3</option>
+                            <option value="4">L4</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" id="btnRefreshApprovals">刷新</button>
+                </div>
+                <div class="main-content" id="approvalsList" style="padding: var(--space-4) var(--space-6);">
+                    <!-- Approval cards populated by JS -->
+                    <div class="text-muted text-sm" style="padding:var(--space-6); text-align:center;">
+                        加载中…
+                    </div>
+                </div>
+                <div class="pagination" id="approvalPagination">
+                    <div class="pagination-info">
+                        <span id="approvalPageInfo">-</span>
+                    </div>
+                    <div class="pagination-controls" id="approvalPageControls">
+                    </div>
+                </div>
+            </div>
+
+            <!-- === Audit Panel === -->
+            <div class="tab-panel" id="panel-audit">
+                <div class="filter-bar">
+                    <div class="filter-group">
+                        <label>时间范围</label>
+                        <select id="auditTimeRange" class="form-select" style="width:auto">
+                            <option value="1h">最近1小时</option>
+                            <option value="24h" selected>最近24小时</option>
+                            <option value="7d">最近7天</option>
+                            <option value="30d">最近30天</option>
+                            <option value="all">全部</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>风险等级</label>
+                        <select id="auditRiskFilter" class="form-select" style="width:auto">
+                            <option value="">全部</option>
+                            <option value="0">L0</option>
+                            <option value="1">L1</option>
+                            <option value="2">L2</option>
+                            <option value="3">L3</option>
+                            <option value="4">L4</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>用户</label>
+                        <input type="text" id="auditUserFilter" placeholder="user_id" style="width:100px">
+                    </div>
+                    <button class="btn btn-secondary btn-sm" id="btnRefreshAudit">刷新</button>
+                    <button class="btn btn-ghost btn-sm" id="btnExportAudit" style="margin-left:auto">📥 导出CSV</button>
+                </div>
+                <div class="data-table-wrapper">
+                    <table class="data-table" id="auditTable">
+                        <thead>
+                            <tr>
+                                <th class="col-time">时间</th>
+                                <th class="col-user">用户</th>
+                                <th class="col-instance">实例</th>
+                                <th class="col-type">类型</th>
+                                <th class="col-risk">风险</th>
+                                <th class="col-sql">SQL</th>
+                                <th class="col-status">状态</th>
+                                <th class="col-duration">耗时</th>
+                            </tr>
+                        </thead>
+                        <tbody id="auditTableBody">
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination" id="auditPagination">
+                    <div class="pagination-info">
+                        <span id="auditPageInfo">-</span>
+                        <div class="filter-group">
+                            <label>每页</label>
+                            <select id="auditPageSize" class="page-size-select">
+                                <option value="20">20</option>
+                                <option value="50" selected>50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="pagination-controls" id="auditPageControls">
+                    </div>
+                </div>
+            </div>
+
+            <!-- === Admin Panel === -->
+            <div class="tab-panel" id="panel-admin">
+                <div class="admin-panel">
+                    <!-- Safety Mode Section -->
+                    <div class="admin-section">
+                        <h2 class="admin-section-title">🛡️ 安全模式</h2>
+                        <div class="admin-card">
+                            <div class="admin-card-header">
+                                <span class="admin-card-title">当前模式</span>
+                                <span class="mode-badge mode-2" id="adminModeBadge">MODERATE</span>
+                            </div>
+                            <div class="safety-switcher" id="safetySwitcher">
+                                <div class="safety-switcher-option mode-0" data-mode="0">只读</div>
+                                <div class="safety-switcher-option mode-1" data-mode="1">保守</div>
+                                <div class="safety-switcher-option active mode-2" data-mode="2">适度</div>
+                                <div class="safety-switcher-option mode-3" data-mode="3">激进</div>
+                                <div class="safety-switcher-option mode-4" data-mode="4">疯子</div>
+                            </div>
+                            <p class="text-sm text-muted mt-2" id="modeDescription">
+                                放行L0/L1，L2及以上强制人工确认并审核回滚脚本
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Risk Rules Section -->
+                    <div class="admin-section">
+                        <h2 class="admin-section-title">📏 风险规则</h2>
+                        <div class="admin-card">
+                            <div class="admin-card-header">
+                                <span class="admin-card-title">活跃规则</span>
+                                <button class="btn btn-secondary btn-sm" id="btnRefreshRules">刷新</button>
+                            </div>
+                            <div id="riskRulesList">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Skills Section -->
+                    <div class="admin-section">
+                        <h2 class="admin-section-title">🧠 技能管理</h2>
+                        <div class="admin-card">
+                            <div class="admin-card-header">
+                                <span class="admin-card-title">已安装技能</span>
+                            </div>
+                            <div id="skillsList">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Instances Section -->
+                    <div class="admin-section">
+                        <h2 class="admin-section-title">🗄️ 数据库实例</h2>
+                        <div class="admin-card">
+                            <div class="admin-card-header">
+                                <span class="admin-card-title">已配置实例</span>
+                                <button class="btn btn-primary btn-sm" id="btnAddInstance">+ 新增实例</button>
+                            </div>
+                            <div id="instancesList">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                        <!-- Add/Edit Instance Form (hidden by default) -->
+                        <div class="admin-card" id="addInstanceForm" style="display:none">
+                            <div class="admin-card-header">
+                                <span class="admin-card-title" id="instanceFormTitle">新增数据库实例</span>
+                                <button class="btn btn-ghost btn-sm" id="btnCancelAddInstance">取消</button>
+                            </div>
+                            <input type="hidden" id="instOriginalName" value="" />
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label class="form-label">实例名称 *</label>
+                                    <input class="form-input" id="instName" placeholder="my_database" />
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">数据库类型</label>
+                                    <select class="form-input" id="instType">
+                                        <option value="postgresql" selected>PostgreSQL</option>
+                                        <option value="mysql">MySQL</option>
+                                        <option value="oracle">Oracle</option>
+                                        <option value="hive">Hive</option>
+                                        <option value="sqlserver">SQL Server</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">主机</label>
+                                    <input class="form-input" id="instHost" value="localhost" />
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">端口</label>
+                                    <input class="form-input" id="instPort" type="number" value="5432" />
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">数据库名称</label>
+                                    <input class="form-input" id="instDatabase" placeholder="mydb" />
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">版本</label>
+                                    <input class="form-input" id="instVersion" placeholder="如: 8.0, 19c, 16" />
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">超时(秒)</label>
+                                    <input class="form-input" id="instTimeout" type="number" value="30" />
+                                </div>
+                            </div>
+                            <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-primary)">
+                                <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--text-secondary)">🔑 连接凭证</div>
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label class="form-label">只读用户名</label>
+                                        <input class="form-input" id="instReadonlyUser" placeholder="readonly_user" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">只读密码</label>
+                                        <input class="form-input" id="instReadonlyPass" type="password" placeholder="••••••" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">管理员用户名</label>
+                                        <input class="form-input" id="instAdminUser" placeholder="admin_user" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">管理员密码</label>
+                                        <input class="form-input" id="instAdminPass" type="password" placeholder="••••••" />
+                                    </div>
+                                </div>
+                                <div class="text-xs text-muted" style="margin-top:4px">
+                                    密码直接保存在配置文件中。也可留空，通过环境变量提供。
+                                </div>
+                            </div>
+                            <div class="form-actions mt-3">
+                                <button class="btn btn-primary btn-sm" id="btnSaveInstance">💾 保存实例</button>
+                                <button class="btn btn-secondary btn-sm" id="btnTestNewInstance">🔌 测试连接</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- LLM Model Config Section -->
+                    <div class="admin-section">
+                        <h2 class="admin-section-title">🤖 LLM 模型配置</h2>
+                        <div class="admin-card">
+                            <div class="admin-card-header">
+                                <span class="admin-card-title">模型设置</span>
+                                <span class="text-xs" id="llmStatusBadge">⏳ 检测中</span>
+                            </div>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label class="form-label">Provider</label>
+                                    <select class="form-input" id="llmProvider">
+                                        <option value="openai-compatible" selected>OpenAI Compatible</option>
+                                        <option value="openai">OpenAI</option>
+                                        <option value="anthropic">Anthropic</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">模型名称 *</label>
+                                    <input class="form-input" id="llmModelName" placeholder="qwen3.6-flash" />
+                                </div>
+                                <div class="form-group" style="grid-column: span 2">
+                                    <label class="form-label">API Base URL *</label>
+                                    <input class="form-input" id="llmBaseUrl"
+                                        placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1" />
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">API Key 环境变量名 *</label>
+                                    <input class="form-input" id="llmApiKeyEnv" placeholder="DASHSCOPE_API_KEY" />
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">环境变量状态</label>
+                                    <span class="form-input" id="llmKeyStatus" style="line-height:32px;border:none;background:transparent">
+                                        -
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="form-actions mt-3">
+                                <button class="btn btn-primary btn-sm" id="btnSaveLlmConfig">💾 保存配置</button>
+                                <button class="btn btn-secondary btn-sm" id="btnTestLlm">🔌 测试连接</button>
+                            </div>
+                            <div class="text-xs text-muted mt-2" id="llmTestResult"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /.main-content -->
+    </main>
+
+    <!-- ========== RIGHT: Context Panel ========== -->
+    <aside class="dba-context" id="contextPanel">
+        <div class="context-header">
+            <span class="context-header-title">任务详情</span>
+            <button class="icon-btn btn-xs" id="btnCloseContext">✕</button>
+        </div>
+
+        <!-- Task Info Section -->
+        <div class="context-section" id="ctxTaskInfo">
+            <div class="context-section-title">当前任务</div>
+            <div class="context-item">
+                <span class="context-item-label">Task ID</span>
+                <span class="context-item-value text-mono" id="ctxTaskId">-</span>
+            </div>
+            <div class="context-item">
+                <span class="context-item-label">意图</span>
+                <span class="context-item-value" id="ctxIntent">-</span>
+            </div>
+            <div class="context-item">
+                <span class="context-item-label">风险等级</span>
+                <span class="context-item-value" id="ctxRiskLevel">-</span>
+            </div>
+            <div class="context-item">
+                <span class="context-item-label">实例</span>
+                <span class="context-item-value" id="ctxInstance">-</span>
+            </div>
+        </div>
+
+        <!-- SQL Generation Section -->
+        <div class="context-section" id="ctxGeneration">
+            <div class="context-section-title">SQL 生成阶段</div>
+            <div class="context-item">
+                <span class="context-item-label">原始请求</span>
+                <span class="context-item-value" id="ctxSourceMessage">-</span>
+            </div>
+            <div class="sql-block" id="ctxGeneratedSqlBlock" style="display:none">
+                <div class="sql-block-risk-bar risk-L1"></div>
+                <pre id="ctxGeneratedSql"></pre>
+            </div>
+            <div class="text-sm text-muted" id="ctxGeneratedSqlEmpty">暂无候选 SQL</div>
+        </div>
+
+        <!-- Pipeline Progress Section -->
+        <div class="context-section" id="ctxPipeline">
+            <div class="context-section-title">流水线进度</div>
+            <div class="pipeline-bar" id="ctxPipelineBar">
+                <div class="pipeline-summary" id="ctxPipelineSummary">
+                    <span>⏳</span>
+                    <span id="ctxPipelineStatus">等待任务</span>
+                    <span class="expand-icon">▶</span>
+                </div>
+                <div class="pipeline-stages" id="ctxPipelineStages">
+                    <!-- Pipeline stages populated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Validation Section -->
+        <div class="context-section" id="ctxValidation">
+            <div class="context-section-title">验证结果</div>
+            <div id="ctxValidationContent" class="text-sm text-muted">
+                -
+            </div>
+        </div>
+
+        <!-- Rollback SQL Section -->
+        <div class="context-section" id="ctxRollback">
+            <div class="context-section-title">回滚脚本</div>
+            <div class="sql-block" id="ctxRollbackBlock" style="display:none">
+                <div class="sql-block-risk-bar risk-L2"></div>
+                <pre id="ctxRollbackSql"></pre>
+            </div>
+            <button class="btn btn-danger btn-sm mt-2" id="btnExecRollback" style="display:none">
+                ⚠️ 执行回滚
+            </button>
+            <div class="text-sm text-muted" id="ctxRollbackEmpty">暂无回滚脚本</div>
+        </div>
+    </aside>
+
+</div><!-- /.dba-app -->
+
+
+<!-- ========== JavaScript Modules ========== -->
+<script type="module">
+    import { store, subscribe, subscribeAny, dispatch, on } from '/static/js/dba_store.js';
+    import { sseClient } from '/static/js/dba_sse.js';
+    import { initPanels, showToast } from '/static/js/dba_panels.js';
+    import { initChat, ensureSession, loadConversation, startNewConversation } from '/static/js/dba_chat.js';
+
+    // Expose to global for debugging
+    window.__dba = { store, subscribe, subscribeAny, dispatch, sseClient };
+
+    // Initialize panels (sidebar nav, theme toggle, tabs — no network)
+    initPanels();
+
+    // Initialize chat (DOM wiring — no network)
+    initChat();
+
+    // Session must be established BEFORE any API calls to avoid CSRF mismatch
+    await ensureSession();
+
+    // Now safe to connect SSE and fetch data
+    sseClient.connect();
+
+    // ---------------------------------------------------------------------------
+    // Sidebar: Conversation List
+    // ---------------------------------------------------------------------------
+    const sessionListEl = document.getElementById('sessionList');
+    const btnNewSession = document.getElementById('btnNewSession');
+    const sessionSearchEl = document.getElementById('sessionSearch');
+
+    async function loadConversations(query) {
+        if (!sessionListEl) return;
+        try {
+            const url = query
+                ? `/api/dba/conversations/search?q=${encodeURIComponent(query)}`
+                : '/api/dba/conversations';
+            const resp = await fetch(url);
+            const data = await resp.json();
+            const list = data.conversations || [];
+            store.conversations = list;
+            renderSessionList(list);
+        } catch (e) {
+            console.error('Load conversations error:', e);
+        }
+    }
+
+    function renderSessionList(list) {
+        if (!sessionListEl) return;
+        if (!list.length) {
+            sessionListEl.innerHTML = '<div class="session-list-empty">暂无会话</div>';
+            return;
+        }
+        sessionListEl.innerHTML = list.map(c => {
+            const active = c.id === store.currentConversationId ? ' active' : '';
+            const time = c.updated_at ? new Date(c.updated_at).toLocaleString('zh-CN', {
+                month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+            }) : '';
+            const title = _escapeHtml(c.title || '未命名会话');
+            return `<div class="session-item${active}" data-conv-id="${c.id}">
+                <div class="session-item-body">
+                    <div class="session-item-title">${title}</div>
+                    <div class="session-item-meta">
+                        <span>${time}</span>
+                        <span>${c.message_count || 0} 条</span>
+                    </div>
+                </div>
+                <button class="session-item-delete" data-conv-id="${c.id}" title="删除会话">&times;</button>
+            </div>`;
+        }).join('');
+    }
+
+    function _escapeHtml(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    // Click a conversation
+    if (sessionListEl) {
+        sessionListEl.addEventListener('click', async (e) => {
+            // Delete button
+            const delBtn = e.target.closest('.session-item-delete');
+            if (delBtn) {
+                e.stopPropagation();
+                const convId = delBtn.dataset.convId;
+                if (!confirm('确定删除此会话？')) return;
+                try {
+                    const csrfToken = window.__dba?._csrfToken || '';
+                    await fetch(`/api/dba/conversations/${convId}`, {
+                        method: 'DELETE',
+                        headers: { 'X-CSRF-Token': csrfToken },
+                    });
+                    if (store.currentConversationId === convId) {
+                        startNewConversation();
+                    }
+                    loadConversations(sessionSearchEl?.value || '');
+                } catch (err) {
+                    console.error('Delete conversation error:', err);
+                }
+                return;
+            }
+            // Click on conversation item
+            const item = e.target.closest('.session-item');
+            if (item) {
+                const convId = item.dataset.convId;
+                if (convId && convId !== store.currentConversationId) {
+                    await loadConversation(convId);
+                    renderSessionList(store.conversations);
+                }
+            }
+        });
+    }
+
+    // New session button
+    if (btnNewSession) {
+        btnNewSession.addEventListener('click', () => {
+            startNewConversation();
+            renderSessionList(store.conversations);
+        });
+    }
+
+    // Search with debounce
+    let _searchTimer = null;
+    if (sessionSearchEl) {
+        sessionSearchEl.addEventListener('input', () => {
+            clearTimeout(_searchTimer);
+            _searchTimer = setTimeout(() => {
+                loadConversations(sessionSearchEl.value.trim());
+            }, 300);
+        });
+    }
+
+    // Refresh sidebar when a new message is sent
+    on('conversations:changed', () => {
+        loadConversations(sessionSearchEl?.value || '');
+    });
+
+    // Initial load of conversations
+    await loadConversations();
+
+    // --- Quick Mode Switch Bar ---
+    const modeBar = document.getElementById('chatModeBar');
+    const modeBtns = modeBar ? modeBar.querySelectorAll('.chat-mode-btn') : [];
+    const lockIcon = document.getElementById('chatModeLockIcon');
+
+    function updateModeBar(mode) {
+        modeBtns.forEach(btn => {
+            btn.classList.toggle('active', parseInt(btn.dataset.mode) === mode);
+        });
+        if (lockIcon) {
+            lockIcon.style.display = store.modeLocked ? '' : 'none';
+        }
+        // Disable buttons if locked
+        modeBtns.forEach(btn => { btn.disabled = store.modeLocked; });
+    }
+
+    subscribe('safetyMode', (val) => updateModeBar(val));
+    subscribe('modeLocked', () => updateModeBar(store.safetyMode));
+
+    modeBtns.forEach(btn => {
+        btn.addEventListener('click', async () => {
+            if (store.modeLocked) return;
+            const mode = parseInt(btn.dataset.mode);
+            if (mode === store.safetyMode) return;
+            try {
+                const csrfToken = window.__dba?._csrfToken || '';
+                const resp = await fetch('/api/dba/mode', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken,
+                    },
+                    body: JSON.stringify({ mode }),
+                });
+                const data = await resp.json();
+                if (data.success !== false) {
+                    store.safetyMode = mode;
+                }
+            } catch (e) {
+                console.error('Mode switch failed:', e);
+            }
+        });
+    });
+
+    // Initialize mode bar from current state
+    updateModeBar(store.safetyMode);
+
+    // Fetch current mode from server
+    fetch('/api/dba/mode').then(r => r.json()).then(data => {
+        if (data.mode != null) {
+            store.safetyMode = data.mode;
+            store.modeLocked = !!data.locked;
+        }
+    }).catch(() => {});
+
+    // --- Rollback Execute Button (Context Panel) ---
+    const btnExecRollback = document.getElementById('btnExecRollback');
+    if (btnExecRollback) {
+        btnExecRollback.addEventListener('click', async () => {
+            const sql = document.getElementById('ctxRollbackSql')?.textContent;
+            if (!sql || !sql.trim()) return;
+            if (!confirm('⚠️ 确定要执行回滚脚本吗？此操作将修改数据库。')) return;
+
+            btnExecRollback.disabled = true;
+            btnExecRollback.textContent = '⏳ 执行中…';
+
+            try {
+                const csrfToken = window.__dba?._csrfToken || '';
+                const resp = await fetch('/api/dba/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken,
+                    },
+                    body: JSON.stringify({
+                        message: sql.trim(),
+                        instance_name: store.currentInstance,
+                        dialect: store.instanceDialect,
+                        is_rollback: true,
+                    }),
+                });
+                const data = await resp.json();
+                if (data.error) {
+                    alert('回滚失败: ' + data.error);
+                } else {
+                    alert('回滚执行完成');
+                }
+            } catch (e) {
+                alert('回滚执行失败: ' + e.message);
+            } finally {
+                btnExecRollback.disabled = false;
+                btnExecRollback.textContent = '⚠️ 执行回滚';
+            }
+        });
+    }
+
+    // Show rollback button when rollback SQL is present
+    subscribe('currentTask', (task) => {
+        const rollbackBlock = document.getElementById('ctxRollbackBlock');
+        const rollbackSql = document.getElementById('ctxRollbackSql');
+        const rollbackEmpty = document.getElementById('ctxRollbackEmpty');
+        const rbBtn = document.getElementById('btnExecRollback');
+        if (task && task.rollback_sql) {
+            if (rollbackBlock) rollbackBlock.style.display = '';
+            if (rollbackSql) rollbackSql.textContent = task.rollback_sql;
+            if (rollbackEmpty) rollbackEmpty.style.display = 'none';
+            if (rbBtn) rbBtn.style.display = '';
+        } else {
+            if (rollbackBlock) rollbackBlock.style.display = 'none';
+            if (rollbackEmpty) rollbackEmpty.style.display = '';
+            if (rbBtn) rbBtn.style.display = 'none';
+        }
+    });
+
+    // --- Instance Management ---
+    const btnAddInstance = document.getElementById('btnAddInstance');
+    const addForm = document.getElementById('addInstanceForm');
+    const btnCancel = document.getElementById('btnCancelAddInstance');
+    const btnSave = document.getElementById('btnSaveInstance');
+    const btnTestNew = document.getElementById('btnTestNewInstance');
+    const instancesList = document.getElementById('instancesList');
+
+    if (btnAddInstance && addForm) {
+        btnAddInstance.addEventListener('click', () => {
+            _resetInstanceForm();
+            addForm.style.display = '';
+        });
+    }
+    if (btnCancel && addForm) {
+        btnCancel.addEventListener('click', () => {
+            addForm.style.display = 'none';
+            _resetInstanceForm();
+        });
+    }
+
+    function _resetInstanceForm() {
+        const el = (id) => document.getElementById(id);
+        if (el('instanceFormTitle')) el('instanceFormTitle').textContent = '新增数据库实例';
+        if (el('instOriginalName')) el('instOriginalName').value = '';
+        if (el('instName')) el('instName').value = '';
+        if (el('instType')) el('instType').value = 'postgresql';
+        if (el('instHost')) el('instHost').value = 'localhost';
+        if (el('instPort')) el('instPort').value = '5432';
+        if (el('instDatabase')) el('instDatabase').value = '';
+        if (el('instVersion')) el('instVersion').value = '';
+        if (el('instTimeout')) el('instTimeout').value = '30';
+        if (el('instReadonlyUser')) el('instReadonlyUser').value = '';
+        if (el('instReadonlyPass')) el('instReadonlyPass').value = '';
+        if (el('instAdminUser')) el('instAdminUser').value = '';
+        if (el('instAdminPass')) el('instAdminPass').value = '';
+        // Enable name field for new instances
+        if (el('instName')) el('instName').disabled = false;
+    }
+
+    function _fillInstanceForm(inst) {
+        const el = (id) => document.getElementById(id);
+        if (el('instanceFormTitle')) el('instanceFormTitle').textContent = `编辑实例: ${inst.name}`;
+        if (el('instOriginalName')) el('instOriginalName').value = inst.name;
+        if (el('instName')) { el('instName').value = inst.name; el('instName').disabled = true; }
+        if (el('instType')) el('instType').value = inst.type || 'postgresql';
+        if (el('instHost')) el('instHost').value = inst.host || 'localhost';
+        if (el('instPort')) el('instPort').value = inst.port || '5432';
+        if (el('instDatabase')) el('instDatabase').value = inst.database || '';
+        if (el('instVersion')) el('instVersion').value = inst.version || '';
+        if (el('instTimeout')) el('instTimeout').value = inst.timeout || '30';
+        // Fill credentials (usernames are real, passwords are masked)
+        if (el('instReadonlyUser')) el('instReadonlyUser').value = inst.readonly_user || '';
+        if (el('instReadonlyPass')) { el('instReadonlyPass').value = ''; el('instReadonlyPass').placeholder = inst.has_readonly_pass ? '••••（已设置，留空不修改）' : '••••••'; }
+        if (el('instAdminUser')) el('instAdminUser').value = inst.admin_user || '';
+        if (el('instAdminPass')) { el('instAdminPass').value = ''; el('instAdminPass').placeholder = inst.has_admin_pass ? '••••（已设置，留空不修改）' : '••••••'; }
+    }
+
+    async function loadInstances() {
+        try {
+            const resp = await fetch('/api/dba/instances', {
+                headers: { 'X-Include-Credentials': 'true' },
+            });
+            const data = await resp.json();
+            const list = data.instances || [];
+            if (!instancesList) return;
+
+            if (list.length === 0) {
+                instancesList.innerHTML = '<div class="text-muted text-sm p-2">暂无配置的实例</div>';
+                return;
+            }
+
+            instancesList.innerHTML = list.map(inst => `
+                <div class="instance-row" data-name="${inst.name}">
+                    <div class="instance-info">
+                        <span class="instance-name">${inst.name}</span>
+                        <span class="instance-detail text-dimmed text-xs">
+                            ${inst.type || 'postgresql'} · ${inst.host || 'localhost'}:${inst.port || 5432} / ${inst.database || '-'}${inst.version ? ' (v' + inst.version + ')' : ''}
+                        </span>
+                    </div>
+                    <div class="instance-actions">
+                        <button class="btn btn-secondary btn-xs edit-inst-btn" data-name="${inst.name}">✏️ 编辑</button>
+                        <button class="btn btn-secondary btn-xs test-inst-btn" data-name="${inst.name}">🔌 测试</button>
+                        <button class="btn btn-danger btn-xs remove-inst-btn" data-name="${inst.name}">🗑️</button>
+                    </div>
+                </div>
+            `).join('');
+
+            // Wire edit buttons
+            instancesList.querySelectorAll('.edit-inst-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const name = btn.dataset.name;
+                    const inst = list.find(i => i.name === name);
+                    if (!inst) return;
+                    _fillInstanceForm(inst);
+                    if (addForm) addForm.style.display = '';
+                });
+            });
+
+            // Wire test buttons
+            instancesList.querySelectorAll('.test-inst-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const name = btn.dataset.name;
+                    btn.textContent = '⏳';
+                    btn.disabled = true;
+                    try {
+                        const csrfToken = window.__dba?._csrfToken || '';
+                        const r = await fetch('/api/dba/instances/test', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                            body: JSON.stringify({ instance_name: name }),
+                        });
+                        const d = await r.json();
+                        btn.textContent = d.success ? '✅' : '❌';
+                    } catch {
+                        btn.textContent = '❌';
+                    }
+                    setTimeout(() => { btn.textContent = '🔌 测试'; btn.disabled = false; }, 2000);
+                });
+            });
+
+            // Wire remove buttons
+            instancesList.querySelectorAll('.remove-inst-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const name = btn.dataset.name;
+                    if (!confirm(`确定要删除实例 "${name}" 吗？`)) return;
+                    try {
+                        const csrfToken = window.__dba?._csrfToken || '';
+                        const r = await fetch('/api/dba/instances', {
+                            method: 'DELETE',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                            body: JSON.stringify({ name }),
+                        });
+                        const d = await r.json();
+                        if (d.success) { loadInstances(); loadInstanceSelector(); }
+                    } catch (e) {
+                        alert('删除失败: ' + e.message);
+                    }
+                });
+            });
+        } catch (e) {
+            if (instancesList) instancesList.innerHTML = '<div class="text-muted text-sm p-2">加载失败</div>';
+        }
+    }
+
+    if (btnSave) {
+        btnSave.addEventListener('click', async () => {
+            const originalName = document.getElementById('instOriginalName')?.value || '';
+            const isEdit = !!originalName;
+
+            const data = {
+                name: document.getElementById('instName')?.value || '',
+                type: document.getElementById('instType')?.value || 'postgresql',
+                host: document.getElementById('instHost')?.value || 'localhost',
+                port: document.getElementById('instPort')?.value || '5432',
+                database: document.getElementById('instDatabase')?.value || '',
+                version: document.getElementById('instVersion')?.value || '',
+                timeout: document.getElementById('instTimeout')?.value || '30',
+                readonly_user: document.getElementById('instReadonlyUser')?.value || '',
+                readonly_pass: document.getElementById('instReadonlyPass')?.value || '',
+                admin_user: document.getElementById('instAdminUser')?.value || '',
+                admin_pass: document.getElementById('instAdminPass')?.value || '',
+            };
+
+            if (!isEdit && !data.name.trim()) { alert('实例名称不能为空'); return; }
+
+            if (isEdit) {
+                data.original_name = originalName;
+            }
+
+            try {
+                const csrfToken = window.__dba?._csrfToken || '';
+                const resp = await fetch('/api/dba/instances', {
+                    method: isEdit ? 'PUT' : 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                    body: JSON.stringify(data),
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    if (addForm) addForm.style.display = 'none';
+                    _resetInstanceForm();
+                    loadInstances();
+                    loadInstanceSelector();
+                } else {
+                    alert(result.error || '保存失败');
+                }
+            } catch (e) {
+                alert('保存失败: ' + e.message);
+            }
+        });
+    }
+
+    if (btnTestNew) {
+        btnTestNew.addEventListener('click', async () => {
+            const name = document.getElementById('instName')?.value?.trim();
+            if (!name) { alert('请先输入实例名称'); return; }
+            btnTestNew.textContent = '⏳ 测试中…';
+            btnTestNew.disabled = true;
+            try {
+                const csrfToken = window.__dba?._csrfToken || '';
+                // Send all form fields so backend can test without requiring a prior save
+                const payload = {
+                    instance_name: name,
+                    type: document.getElementById('instType')?.value || 'postgresql',
+                    host: document.getElementById('instHost')?.value || 'localhost',
+                    port: document.getElementById('instPort')?.value || '5432',
+                    database: document.getElementById('instDatabase')?.value || '',
+                    readonly_user: document.getElementById('instReadonlyUser')?.value || '',
+                    readonly_pass: document.getElementById('instReadonlyPass')?.value || '',
+                };
+                const resp = await fetch('/api/dba/instances/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                    body: JSON.stringify(payload),
+                });
+                const data = await resp.json();
+                alert(data.success ? '✅ 连接成功' : '❌ 连接失败: ' + (data.error || ''));
+            } catch (e) {
+                alert('测试失败: ' + e.message);
+            } finally {
+                btnTestNew.textContent = '🔌 测试连接';
+                btnTestNew.disabled = false;
+            }
+        });
+    }
+
+    // --- LLM Config Management ---
+    const btnSaveLlm = document.getElementById('btnSaveLlmConfig');
+    const btnTestLlm = document.getElementById('btnTestLlm');
+    const llmTestResult = document.getElementById('llmTestResult');
+
+    async function loadLlmConfig() {
+        try {
+            const resp = await fetch('/api/dba/llm-config');
+            const data = await resp.json();
+            const cfg = data.config || {};
+            const el = (id) => document.getElementById(id);
+            if (el('llmProvider')) el('llmProvider').value = cfg.provider || 'openai-compatible';
+            if (el('llmModelName')) el('llmModelName').value = cfg.model_name || '';
+            if (el('llmBaseUrl')) el('llmBaseUrl').value = cfg.base_url || '';
+            if (el('llmApiKeyEnv')) el('llmApiKeyEnv').value = cfg.api_key_env || '';
+
+            const statusBadge = el('llmStatusBadge');
+            const keyStatus = el('llmKeyStatus');
+            if (data.configured) {
+                if (statusBadge) statusBadge.innerHTML = '<span class="text-success">✅ 已配置</span>';
+                if (keyStatus) keyStatus.innerHTML = '<span class="text-success">✅ 已设置</span>';
+            } else {
+                if (statusBadge) statusBadge.innerHTML = '<span class="text-warning">⚠️ 未完成</span>';
+                if (keyStatus) keyStatus.innerHTML = '<span class="text-warning">⚠️ 未设置</span>';
+            }
+        } catch (e) {
+            console.error('Load LLM config failed:', e);
+        }
+    }
+
+    if (btnSaveLlm) {
+        btnSaveLlm.addEventListener('click', async () => {
+            const data = {
+                provider: document.getElementById('llmProvider')?.value || 'openai-compatible',
+                model_name: document.getElementById('llmModelName')?.value || '',
+                base_url: document.getElementById('llmBaseUrl')?.value || '',
+                api_key_env: document.getElementById('llmApiKeyEnv')?.value || '',
+            };
+            try {
+                const csrfToken = window.__dba?._csrfToken || '';
+                const resp = await fetch('/api/dba/llm-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                    body: JSON.stringify(data),
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    if (llmTestResult) llmTestResult.textContent = '✅ 配置已保存';
+                    loadLlmConfig();
+                } else {
+                    if (llmTestResult) llmTestResult.textContent = '❌ ' + (result.error || '保存失败');
+                }
+            } catch (e) {
+                if (llmTestResult) llmTestResult.textContent = '❌ 保存失败: ' + e.message;
+            }
+        });
+    }
+
+    if (btnTestLlm) {
+        btnTestLlm.addEventListener('click', async () => {
+            btnTestLlm.disabled = true;
+            btnTestLlm.textContent = '⏳ 测试中…';
+            if (llmTestResult) llmTestResult.textContent = '';
+            try {
+                const csrfToken = window.__dba?._csrfToken || '';
+                const resp = await fetch('/api/dba/llm-config/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                    body: JSON.stringify({}),
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    if (llmTestResult) llmTestResult.textContent = '✅ 连接成功: ' + (data.content || '');
+                } else {
+                    if (llmTestResult) llmTestResult.textContent = '❌ ' + (data.error || '测试失败');
+                }
+            } catch (e) {
+                if (llmTestResult) llmTestResult.textContent = '❌ 测试失败: ' + e.message;
+            } finally {
+                btnTestLlm.disabled = false;
+                btnTestLlm.textContent = '🔌 测试连接';
+            }
+        });
+    }
+
+    // --- Admin Mode Switcher (full admin panel) ---
+    const adminSwitcher = document.getElementById('safetySwitcher');
+    if (adminSwitcher) {
+        const options = adminSwitcher.querySelectorAll('.safety-switcher-option');
+        options.forEach(opt => {
+            opt.addEventListener('click', async () => {
+                if (store.modeLocked) return;
+                const mode = parseInt(opt.dataset.mode);
+                if (mode === store.safetyMode) return;
+                try {
+                    const csrfToken = window.__dba?._csrfToken || '';
+                    const resp = await fetch('/api/dba/mode', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                        body: JSON.stringify({ mode }),
+                    });
+                    const data = await resp.json();
+                    if (data.success !== false) {
+                        store.safetyMode = mode;
+                    }
+                } catch (e) {
+                    console.error('Admin mode switch failed:', e);
+                }
+            });
+        });
+    }
+
+    // --- Load Approvals List (with filters) ---
+    async function loadApprovals() {
+        const status = document.getElementById('approvalFilterStatus')?.value || '';
+        const risk = document.getElementById('approvalFilterRisk')?.value || '';
+        let url = '/api/dba/approvals?limit=50';
+        if (status) url += '&status=' + encodeURIComponent(status);
+        if (risk) url += '&risk_level=' + encodeURIComponent(risk);
+        try {
+            const resp = await fetch(url);
+            const data = await resp.json();
+            const list = data.requests || data.approvals || [];
+            const container = document.getElementById('approvalsList');
+            if (!container) return;
+
+            store.pendingCount = list.filter(a => a.status === 'pending').length;
+
+            if (list.length === 0) {
+                container.innerHTML = '<div class="text-muted text-sm p-4">暂无审批记录</div>';
+                return;
+            }
+
+            container.innerHTML = list.slice(0, 50).map(a => {
+                const risk = a.risk_level || 0;
+                const statusMap = { pending: '⏳ 待审批', approved: '✅ 已通过', rejected: '❌ 已驳回', modified: '✏️ 已修改' };
+                return `
+                    <div class="approval-card risk-L${risk}">
+                        <div class="approval-header">
+                            <span class="risk-badge risk-L${risk}">L${risk}</span>
+                            <span>${statusMap[a.status] || a.status}</span>
+                            <span class="text-xs text-dimmed">${a.request_id || ''}</span>
+                        </div>
+                        <div class="approval-sql text-sm">${escHtml(a.sql || '')}</div>
+                        <div class="approval-meta text-xs text-muted">
+                            实例: ${escHtml(a.instance_name || '-')} · 操作: ${escHtml(a.operation_type || '-')}
+                        </div>
+                    </div>`;
+            }).join('');
+            const pageInfo = document.getElementById('approvalPageInfo');
+            if (pageInfo) pageInfo.textContent = `共 ${data.total || list.length} 条`;
+        } catch (e) {
+            console.error('Load approvals failed:', e);
+        }
+    }
+
+    // --- Load Audit Logs (with filters) ---
+    async function loadAuditLogs() {
+        const timeRange = document.getElementById('auditTimeRange')?.value || '24h';
+        const riskFilter = document.getElementById('auditRiskFilter')?.value || '';
+        const userFilter = document.getElementById('auditUserFilter')?.value || '';
+        const pageSize = document.getElementById('auditPageSize')?.value || '50';
+
+        // Convert time range to start_time
+        const now = Date.now() / 1000;
+        const rangeMap = { '1h': 3600, '24h': 86400, '7d': 604800, '30d': 2592000 };
+        const startTime = rangeMap[timeRange] ? now - rangeMap[timeRange] : '';
+
+        let url = `/api/dba/audit?limit=${pageSize}`;
+        if (startTime) url += '&start_time=' + encodeURIComponent(new Date(startTime * 1000).toISOString());
+        if (riskFilter) url += '&risk_level=' + encodeURIComponent(riskFilter);
+        if (userFilter) url += '&user_id=' + encodeURIComponent(userFilter);
+
+        try {
+            const resp = await fetch(url);
+            const data = await resp.json();
+            const logs = data.logs || [];
+            const tbody = document.getElementById('auditTableBody');
+            if (!tbody) return;
+
+            if (logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-muted text-sm" style="text-align:center;padding:20px">暂无审计记录</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = logs.map(log => {
+                const risk = log.risk_level || 0;
+                const time = log.timestamp ? new Date(log.timestamp * 1000).toLocaleString('zh-CN') : '-';
+                return `
+                    <tr>
+                        <td class="text-xs">${time}</td>
+                        <td>${escHtml(log.user_id || '-')}</td>
+                        <td>${escHtml(log.instance_name || '-')}</td>
+                        <td>${escHtml(log.operation_type || '-')}</td>
+                        <td><span class="risk-badge risk-L${risk}">L${risk}</span></td>
+                        <td class="text-xs text-mono">${escHtml((log.sql || '').substring(0, 80))}</td>
+                        <td>${log.success ? '✅' : '❌'}</td>
+                        <td class="text-xs">${log.duration_ms ? log.duration_ms + 'ms' : '-'}</td>
+                    </tr>`;
+            }).join('');
+
+            const pageInfo = document.getElementById('auditPageInfo');
+            if (pageInfo) pageInfo.textContent = `共 ${data.total || logs.length} 条记录`;
+        } catch (e) {
+            console.error('Load audit failed:', e);
+        }
+    }
+
+    // --- Load Dashboard Stats + Charts ---
+    let opsChart = null, riskChart = null;
+
+    async function loadDashboard() {
+        try {
+            const resp = await fetch('/api/dba/dashboard/stats');
+            const data = await resp.json();
+            const el = (id) => document.getElementById(id);
+            if (el('statOpsToday')) el('statOpsToday').textContent = data.ops_today ?? '--';
+            if (el('statPendingApprovals')) el('statPendingApprovals').textContent = data.pending_approvals ?? '--';
+            if (el('statBlockRate')) el('statBlockRate').textContent = data.block_rate != null ? data.block_rate.toFixed(1) + '%' : '--';
+            if (el('statRiskIndex')) el('statRiskIndex').textContent = data.risk_index ?? '--';
+            store.dashboardStats = data;
+        } catch (e) {
+            console.error('Load dashboard failed:', e);
+        }
+        // Load charts
+        loadOpsChart();
+        loadRiskChart();
+    }
+
+    async function loadOpsChart(range) {
+        if (typeof Chart === 'undefined') return;
+        const activeTab = document.querySelector('.chart-tab.active');
+        range = range || (activeTab ? activeTab.dataset.range : '24h');
+        const hoursMap = {'24h': 24, '7d': 168, '30d': 720};
+        const hours = hoursMap[range] || 24;
+        try {
+            const resp = await fetch(`/api/dba/dashboard/ops-trend?hours=${hours}`);
+            const data = await resp.json();
+            const trend = data.trend || [];
+            const canvas = document.getElementById('chartOps');
+            if (!canvas) return;
+            if (opsChart) opsChart.destroy();
+            opsChart = new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels: trend.map(t => {
+                        if (t.time || t.label) return t.time || t.label;
+                        if (t.timestamp) {
+                            const d = new Date(t.timestamp * 1000);
+                            return d.getHours().toString().padStart(2,'0') + ':00';
+                        }
+                        return '';
+                    }),
+                    datasets: [{
+                        label: '操作数',
+                        data: trend.map(t => t.count || t.value || 0),
+                        borderColor: '#5B6FE6',
+                        backgroundColor: 'rgba(91,111,230,0.1)',
+                        fill: true,
+                        tension: 0.3,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#8B949E', font: { size: 10 } }, grid: { color: 'rgba(139,148,158,0.1)' } },
+                        y: { ticks: { color: '#8B949E', font: { size: 10 } }, grid: { color: 'rgba(139,148,158,0.1)' }, beginAtZero: true },
+                    },
+                },
+            });
+        } catch (e) { console.error('Load ops chart failed:', e); }
+    }
+
+    async function loadRiskChart() {
+        if (typeof Chart === 'undefined') return;
+        try {
+            const resp = await fetch('/api/dba/dashboard/risk-dist');
+            const data = await resp.json();
+            const dist = data.distribution || {};
+            const canvas = document.getElementById('chartRisk');
+            if (!canvas) return;
+            if (riskChart) riskChart.destroy();
+            const labels = Object.keys(dist).length ? Object.keys(dist) : ['L0','L1','L2','L3','L4'];
+            const values = labels.map(l => dist[l] || 0);
+            riskChart = new Chart(canvas, {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: ['#2EA043','#3B82F6','#D29922','#DB6D28','#F85149'],
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#8B949E', font: { size: 11 } } },
+                    },
+                },
+            });
+        } catch (e) { console.error('Load risk chart failed:', e); }
+    }
+
+    // --- Load Risk Rules ---
+    async function loadRiskRules() {
+        try {
+            const resp = await fetch('/api/dba/rules');
+            const data = await resp.json();
+            const rules = data.rules || [];
+            const container = document.getElementById('riskRulesList');
+            if (!container) return;
+            if (rules.length === 0) {
+                container.innerHTML = '<div class="text-muted text-sm p-2">暂无自定义规则</div>';
+                return;
+            }
+            container.innerHTML = rules.map(r => `
+                <div class="rule-row" style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border-primary);">
+                    <div>
+                        <span class="text-sm">${escHtml(r.name || r.pattern || '-')}</span>
+                        <span class="text-xs text-muted" style="margin-left:8px">${escHtml(r.description || '')}</span>
+                    </div>
+                    <span class="risk-badge risk-L${r.risk_level || 0}">L${r.risk_level || 0}</span>
+                </div>
+            `).join('');
+        } catch (e) { console.error('Load rules failed:', e); }
+    }
+
+    // --- Load Skills ---
+    async function loadSkills() {
+        try {
+            const resp = await fetch('/api/dba/skills');
+            const data = await resp.json();
+            const skills = data.skills || [];
+            const container = document.getElementById('skillsList');
+            if (!container) return;
+            if (skills.length === 0) {
+                container.innerHTML = '<div class="text-muted text-sm p-2">暂无已安装技能</div>';
+                return;
+            }
+            container.innerHTML = skills.map(s => `
+                <div class="skill-row" style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border-primary);">
+                    <div>
+                        <span class="text-sm">${escHtml(s.name || '-')}</span>
+                        <span class="text-xs text-muted" style="margin-left:8px">${escHtml(s.description || '')}</span>
+                    </div>
+                    <span class="text-xs ${s.enabled ? 'text-success' : 'text-muted'}">${s.enabled ? '✅ 启用' : '⏸ 禁用'}</span>
+                </div>
+            `).join('');
+        } catch (e) { console.error('Load skills failed:', e); }
+    }
+
+    // --- Sidebar Instance Selector ---
+    async function loadInstanceSelector() {
+        try {
+            const resp = await fetch('/api/dba/instances');
+            const data = await resp.json();
+            const list = data.instances || [];
+            const select = document.getElementById('instanceSelect');
+            if (!select || list.length === 0) return;
+            select.innerHTML = list.map(inst =>
+                `<option value="${escHtml(inst.name)}" ${inst.name === store.currentInstance ? 'selected' : ''}>${escHtml(inst.name)}</option>`
+            ).join('');
+        } catch (e) { console.error('Load instance selector failed:', e); }
+    }
+
+    const instanceSelect = document.getElementById('instanceSelect');
+    if (instanceSelect) {
+        instanceSelect.addEventListener('change', (e) => {
+            const name = e.target.value;
+            store.currentInstance = name;
+            // Update instance dot
+            const dot = document.getElementById('instanceDot');
+            if (dot) dot.className = 'sidebar-instance-dot';
+            showToast(`已切换到实例: ${name}`, 'success', 2000);
+        });
+    }
+
+    // --- Wire up Refresh & Export Buttons ---
+    const btnRefreshApprovals = document.getElementById('btnRefreshApprovals');
+    if (btnRefreshApprovals) btnRefreshApprovals.addEventListener('click', () => loadApprovals());
+
+    const btnRefreshAudit = document.getElementById('btnRefreshAudit');
+    if (btnRefreshAudit) btnRefreshAudit.addEventListener('click', () => loadAuditLogs());
+
+    const btnExportAudit = document.getElementById('btnExportAudit');
+    if (btnExportAudit) {
+        btnExportAudit.addEventListener('click', () => {
+            const timeRange = document.getElementById('auditTimeRange')?.value || '24h';
+            const riskFilter = document.getElementById('auditRiskFilter')?.value || '';
+            const userFilter = document.getElementById('auditUserFilter')?.value || '';
+            const now = Date.now() / 1000;
+            const rangeMap = { '1h': 3600, '24h': 86400, '7d': 604800, '30d': 2592000 };
+            const startTime = rangeMap[timeRange] ? now - rangeMap[timeRange] : '';
+            let url = '/api/dba/audit/export?';
+            if (startTime) url += 'start_time=' + encodeURIComponent(new Date(startTime * 1000).toISOString()) + '&';
+            if (riskFilter) url += 'risk_level=' + riskFilter + '&';
+            if (userFilter) url += 'user_id=' + encodeURIComponent(userFilter) + '&';
+            window.open(url, '_blank');
+        });
+    }
+
+    const btnRefreshRules = document.getElementById('btnRefreshRules');
+    if (btnRefreshRules) btnRefreshRules.addEventListener('click', () => loadRiskRules());
+
+    // --- Wire up Filter Change Events ---
+    ['approvalFilterStatus', 'approvalFilterRisk'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', () => loadApprovals());
+    });
+
+    ['auditTimeRange', 'auditRiskFilter', 'auditPageSize'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', () => loadAuditLogs());
+    });
+
+    const auditUserInput = document.getElementById('auditUserFilter');
+    if (auditUserInput) {
+        let debounce = null;
+        auditUserInput.addEventListener('input', () => {
+            clearTimeout(debounce);
+            debounce = setTimeout(() => loadAuditLogs(), 400);
+        });
+    }
+
+    // --- Chart Tab Switcher ---
+    document.querySelectorAll('.chart-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            loadOpsChart(tab.dataset.range);
+        });
+    });
+
+    // --- Instance Dot online/offline ---
+    subscribe('instanceOnline', (online) => {
+        const dot = document.getElementById('instanceDot');
+        if (dot) dot.classList.toggle('offline', !online);
+    });
+
+    function escHtml(text) {
+        const d = document.createElement('div');
+        d.textContent = text || '';
+        return d.innerHTML;
+    }
+
+    // --- Load data when panels open ---
+    subscribe('activePanel', (panel) => {
+        if (panel === 'admin') {
+            loadInstances();
+            loadLlmConfig();
+            loadRiskRules();
+            loadSkills();
+        }
+        if (panel === 'approvals') loadApprovals();
+        if (panel === 'audit') loadAuditLogs();
+        if (panel === 'dashboard') loadDashboard();
+    });
+
+    // --- Initial loads ---
+    loadInstanceSelector();
+</script>
+
+</body>
+</html>

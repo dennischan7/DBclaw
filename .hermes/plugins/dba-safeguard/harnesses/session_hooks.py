@@ -18,11 +18,16 @@ from typing import Any, Optional
 logger = logging.getLogger("dba_safeguard.harnesses.session_hooks")
 
 
-async def on_session_start_hook(
-    context: Optional[Any] = None,
+def on_session_start_hook(
+    session_id: str = "",
+    model: str = "",
+    platform: str = "",
     **kwargs,
 ) -> None:
-    """Initialize DBA SafeGuard resources at session start."""
+    """Initialize DBA SafeGuard resources at session start.
+
+    Hermes passes: session_id, model, platform.
+    """
     logger.info("DBA SafeGuard session starting...")
 
     try:
@@ -43,11 +48,18 @@ async def on_session_start_hook(
         logger.warning("Audit DB init failed (non-fatal): %s", e)
 
 
-async def on_session_end_hook(
-    context: Optional[Any] = None,
+def on_session_end_hook(
+    session_id: str = "",
+    completed: bool = False,
+    interrupted: bool = False,
+    model: str = "",
+    platform: str = "",
     **kwargs,
 ) -> None:
-    """Clean up DBA SafeGuard resources at session end."""
+    """Clean up DBA SafeGuard resources at session end.
+
+    Hermes passes: session_id, completed, interrupted, model, platform.
+    """
     logger.info("DBA SafeGuard session ending...")
 
     try:

@@ -1,5 +1,5 @@
 """
-Hermes CLI - Unified command-line interface for Hermes Agent.
+DBclaw CLI - Unified command-line interface for DBclaw.
 
 Provides subcommands for:
 - hermes chat          - Interactive chat (same as ./hermes)
@@ -11,5 +11,5 @@ Provides subcommands for:
 - hermes cron          - Manage cron jobs
 """
 
-__version__ = "0.9.0"
-__release_date__ = "2026.4.13"
+__version__ = "0.1.0"
+__release_date__ = "2026.4.22"
