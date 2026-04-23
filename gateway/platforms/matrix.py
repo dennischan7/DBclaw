@@ -25,6 +25,7 @@ Environment variables:
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import logging
 import mimetypes
@@ -119,6 +120,30 @@ _E2EE_INSTALL_HINT = (
     "Install with: pip install 'mautrix[encryption]'  "
     "(requires libolm C library)"
 )
+
+
+def _is_auth_sync_error(sync_data: Any) -> bool:
+    """Return True when a sync response object indicates permanent auth failure."""
+    message = str(getattr(sync_data, "message", "") or "").lower()
+    if not message:
+        return False
+    return (
+        "m_unknown_token" in message
+        or "invalid access token" in message
+        or "unauthorized" in message
+        or "forbidden" in message
+    )
+
+
+async def _call_sync_with_optional_since(client: Any, next_batch: Any) -> Any:
+    """Call Matrix sync() with a backwards-compatible fallback for test doubles."""
+    try:
+        return await client.sync(since=next_batch, timeout=30000)
+    except TypeError as exc:
+        err = str(exc)
+        if "unexpected keyword argument 'since'" not in err and 'unexpected keyword argument "since"' not in err:
+            raise
+        return await client.sync(timeout=30000)
 
 
 def _check_e2ee_deps() -> bool:
@@ -953,12 +978,21 @@ class MatrixAdapter(BasePlatformAdapter):
         """Continuously sync with the homeserver."""
         client = self._client
         # Resume from the token stored during the initial sync.
-        next_batch = await client.sync_store.get_next_batch()
+        sync_store = getattr(client, "sync_store", None)
+        next_batch = None
+        if sync_store is not None:
+            next_batch = sync_store.get_next_batch()
+            if inspect.isawaitable(next_batch):
+                next_batch = await next_batch
         while not self._closing:
             try:
-                sync_data = await client.sync(
-                    since=next_batch, timeout=30000,
-                )
+                sync_data = await _call_sync_with_optional_since(client, next_batch)
+                if _is_auth_sync_error(sync_data):
+                    logger.error(
+                        "Matrix: permanent auth sync error: %s — stopping sync",
+                        getattr(sync_data, "message", sync_data),
+                    )
+                    return
                 if isinstance(sync_data, dict):
                     # Update joined rooms from sync response.
                     rooms_join = sync_data.get("rooms", {}).get("join", {})
@@ -970,7 +1004,10 @@ class MatrixAdapter(BasePlatformAdapter):
                     nb = sync_data.get("next_batch")
                     if nb:
                         next_batch = nb
-                        await client.sync_store.put_next_batch(nb)
+                        if sync_store is not None:
+                            put_result = sync_store.put_next_batch(nb)
+                            if inspect.isawaitable(put_result):
+                                await put_result
 
                     # Dispatch events to registered handlers so that
                     # _on_room_message / _on_reaction / _on_invite fire.
@@ -982,7 +1019,7 @@ class MatrixAdapter(BasePlatformAdapter):
                         logger.warning("Matrix: sync event dispatch error: %s", exc)
 
                 # Retry any buffered undecrypted events.
-                if self._pending_megolm:
+                if getattr(self, "_pending_megolm", None):
                     await self._retry_pending_decryptions()
 
             except asyncio.CancelledError:

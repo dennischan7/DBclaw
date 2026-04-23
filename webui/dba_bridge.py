@@ -789,6 +789,7 @@ def _generate_sql_from_nl(
         content = (msg.get("content") or "").strip()
         if role in {"user", "assistant"} and content:
             recent_history.append(f"{role}: {content[:300]}")
+    recent_history_text = "\n".join(recent_history) if recent_history else "无"
 
     prompt = (
         "请把用户的数据库操作需求转换为可执行 SQL。"
@@ -813,7 +814,7 @@ def _generate_sql_from_nl(
         f"[数据库上下文]\n{db_context or '无'}\n\n"
         f"[官方文档片段]\n{library_context or '无'}\n\n"
         f"[表结构元数据]\n{metadata_context or '无'}\n\n"
-        f"[最近对话]\n{'\n'.join(recent_history) or '无'}"
+        f"[最近对话]\n{recent_history_text}"
     )
 
     result = chat_completion(

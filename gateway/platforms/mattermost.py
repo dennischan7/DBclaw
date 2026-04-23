@@ -518,10 +518,10 @@ class MattermostAdapter(BasePlatformAdapter):
                 # Detect permanent auth/permission failures that will never
                 # succeed on retry — stop reconnecting instead of looping forever.
                 import aiohttp
-                err_str = str(exc).lower()
                 if isinstance(exc, aiohttp.WSServerHandshakeError) and exc.status in (401, 403):
                     logger.error("Mattermost WS auth failed (HTTP %d) — stopping reconnect", exc.status)
                     return
+                err_str = str(exc).lower()
                 if "401" in err_str or "403" in err_str or "unauthorized" in err_str:
                     logger.error("Mattermost WS permanent error: %s — stopping reconnect", exc)
                     return

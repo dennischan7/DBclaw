@@ -1750,6 +1750,25 @@ def resolve_vision_provider_client(
     return requested, client, final_model
 
 
+def get_vision_auxiliary_client(
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+    *,
+    base_url: Optional[str] = None,
+    api_key: Optional[str] = None,
+    async_mode: bool = False,
+) -> Tuple[Optional[Any], Optional[str]]:
+    """Backward-compatible wrapper returning only the resolved client and model."""
+    _, client, resolved_model = resolve_vision_provider_client(
+        provider=provider,
+        model=model,
+        base_url=base_url,
+        api_key=api_key,
+        async_mode=async_mode,
+    )
+    return client, resolved_model
+
+
 def get_auxiliary_extra_body() -> dict:
     """Return extra_body kwargs for auxiliary API calls.
     

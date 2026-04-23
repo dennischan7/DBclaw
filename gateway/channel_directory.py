@@ -77,12 +77,19 @@ def build_channel_directory(adapters: Dict[Any, Any]) -> Dict[str, Any]:
             logger.warning("Channel directory: failed to build %s: %s", platform.value, e)
 
     # Platforms that don't support direct channel enumeration get session-based
-    # discovery automatically.  Skip infrastructure entries that aren't messaging
-    # platforms — everything else falls through to _build_from_sessions().
+    # discovery automatically. Keep "email" explicit here so gateway tests and
+    # future refactors don't accidentally drop it from session discovery.
+    _EXPLICIT_SESSION_DISCOVERY = frozenset({"email"})
+
+    # Skip infrastructure entries that aren't messaging platforms — everything
+    # else falls through to _build_from_sessions().
     _SKIP_SESSION_DISCOVERY = frozenset({"local", "api_server", "webhook"})
     for plat in Platform:
         plat_name = plat.value
         if plat_name in _SKIP_SESSION_DISCOVERY or plat_name in platforms:
+            continue
+        if plat_name in _EXPLICIT_SESSION_DISCOVERY:
+            platforms[plat_name] = _build_from_sessions(plat_name)
             continue
         platforms[plat_name] = _build_from_sessions(plat_name)
 

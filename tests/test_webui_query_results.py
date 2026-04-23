@@ -15,6 +15,25 @@ if str(plugin_root) not in sys.path:
     sys.path.insert(0, str(plugin_root))
 
 
+def _reset_modules(prefixes):
+    for name in list(sys.modules):
+        if name == "tools" or any(name.startswith(prefix) for prefix in prefixes):
+            sys.modules.pop(name, None)
+
+
+def setup_module(module):
+    module._ORIGINAL_TOOL_MODULES = {
+        name: loaded_module
+        for name, loaded_module in sys.modules.items()
+        if name == "tools" or name.startswith("tools.")
+    }
+
+
+def teardown_module(module):
+    _reset_modules(("tools.",))
+    sys.modules.update(getattr(module, "_ORIGINAL_TOOL_MODULES", {}))
+
+
 def _import_plugin_module(module_name):
     sys.modules.pop("tools", None)
     sys.modules.pop(module_name, None)

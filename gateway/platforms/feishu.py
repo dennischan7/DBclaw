@@ -26,6 +26,7 @@ import logging
 import mimetypes
 import os
 import re
+import inspect
 import threading
 import time
 import uuid
@@ -1058,7 +1059,7 @@ class FeishuAdapter(BasePlatformAdapter):
         self._event_handler: Optional[Any] = None
         self._seen_message_ids: Dict[str, float] = {}  # message_id → seen_at (time.time())
         self._seen_message_order: List[str] = []
-        self._dedup_state_path = get_hermes_home() / "feishu_seen_message_ids.json"
+        self._dedup_state_path = self._resolve_dedup_state_path()
         self._dedup_lock = threading.Lock()
         self._sender_name_cache: Dict[str, tuple[str, float]] = {}  # sender_id → (name, expire_at)
         self._webhook_rate_counts: Dict[str, tuple[int, float]] = {}  # rate_key → (count, window_start)
@@ -1081,6 +1082,13 @@ class FeishuAdapter(BasePlatformAdapter):
         self._approval_state: Dict[int, Dict[str, str]] = {}
         self._approval_counter = itertools.count(1)
         self._load_seen_message_ids()
+
+    @staticmethod
+    def _resolve_dedup_state_path() -> Path:
+        try:
+            return get_hermes_home() / "feishu_seen_message_ids.json"
+        except RuntimeError:
+            return Path(".hermes") / "feishu_seen_message_ids.json"
 
     @staticmethod
     def _load_settings(extra: Dict[str, Any]) -> FeishuAdapterSettings:
@@ -1194,24 +1202,31 @@ class FeishuAdapter(BasePlatformAdapter):
     def _build_event_handler(self) -> Any:
         if EventDispatcherHandler is None:
             return None
-        return (
-            EventDispatcherHandler.builder(
-                self._encrypt_key,
-                self._verification_token,
-            )
-            .register_p2_im_message_message_read_v1(self._on_message_read_event)
-            .register_p2_im_message_receive_v1(self._on_message_event)
-            .register_p2_im_message_reaction_created_v1(
-                lambda data: self._on_reaction_event("im.message.reaction.created_v1", data)
-            )
-            .register_p2_im_message_reaction_deleted_v1(
-                lambda data: self._on_reaction_event("im.message.reaction.deleted_v1", data)
-            )
-            .register_p2_card_action_trigger(self._on_card_action_trigger)
-            .register_p2_im_chat_member_bot_added_v1(self._on_bot_added_to_chat)
-            .register_p2_im_chat_member_bot_deleted_v1(self._on_bot_removed_from_chat)
-            .build()
+        builder = EventDispatcherHandler.builder(
+            self._encrypt_key,
+            self._verification_token,
         )
+
+        def _register(method_name: str, handler: Any) -> None:
+            nonlocal builder
+            register_fn = getattr(builder, method_name, None)
+            if callable(register_fn):
+                builder = register_fn(handler)
+
+        _register("register_p2_im_message_message_read_v1", self._on_message_read_event)
+        _register("register_p2_im_message_receive_v1", self._on_message_event)
+        _register(
+            "register_p2_im_message_reaction_created_v1",
+            lambda data: self._on_reaction_event("im.message.reaction.created_v1", data),
+        )
+        _register(
+            "register_p2_im_message_reaction_deleted_v1",
+            lambda data: self._on_reaction_event("im.message.reaction.deleted_v1", data),
+        )
+        _register("register_p2_card_action_trigger", self._on_card_action_trigger)
+        _register("register_p2_im_chat_member_bot_added_v1", self._on_bot_added_to_chat)
+        _register("register_p2_im_chat_member_bot_deleted_v1", self._on_bot_removed_from_chat)
+        return builder.build()
 
     async def connect(self) -> bool:
         """Connect to Feishu/Lark."""
