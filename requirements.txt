@@ -16,6 +16,15 @@ jinja2
 pydantic>=2.0
 PyJWT[crypto]
 debugpy
+sqlglot>=25.0.0,<26
+sqlalchemy>=2.0.0,<3
+pymysql>=1.1.0,<2
+psycopg2-binary>=2.9.0,<3
+
+# Optional enterprise database drivers (require extra system clients on many hosts)
+# Oracle: pip install -e ".[dba-oracle]"
+# SQL Server: pip install -e ".[dba-sqlserver]"
+# Hive: pip install -e ".[dba-hive]"
 
 # Web tools
 firecrawl-py
