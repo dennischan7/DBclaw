@@ -25,6 +25,11 @@ dependencies = [
   "pydantic>=2.12.5,<3",
   # Interactive CLI (prompt_toolkit is used directly by cli.py)
   "prompt_toolkit>=3.0.52,<4",
+  # Core DBA / WebUI database connectivity
+  "sqlglot>=25.0.0,<26",
+  "sqlalchemy>=2.0.0,<3",
+  "pymysql>=1.1.0,<2",
+  "psycopg2-binary>=2.9.0,<3",
   # Tools
   "exa-py>=2.9.0,<3",
   "firecrawl-py>=4.16.0,<5",
@@ -76,14 +81,15 @@ termux = [
 ]
 dingtalk = ["dingtalk-stream>=0.1.0,<1"]
 feishu = ["lark-oapi>=1.5.3,<2"]
+dba-postgres = []
+dba-mysql = []
+dba-oracle = ["cx_Oracle>=8.3.0,<9"]
+dba-sqlserver = ["pyodbc>=5.0.0,<6"]
+dba-hive = ["pyhive[hive_pure_sasl]>=0.7.0,<1"]
 dba = [
-  "sqlglot>=25.0.0,<26",
-  "sqlalchemy>=2.0.0,<3",
-  "pymysql>=1.1.0,<2",
-  "psycopg2-binary>=2.9.0,<3",
-  "cx_Oracle>=8.3.0,<9",
-  "pyodbc>=5.0.0,<6",
-  "pyhive[hive_pure_sasl]>=0.7.0,<1",
+  "dbclaw[dba-oracle]",
+  "dbclaw[dba-sqlserver]",
+  "dbclaw[dba-hive]",
 ]
 web = ["fastapi>=0.104.0,<1", "uvicorn[standard]>=0.24.0,<1"]
 rl = [

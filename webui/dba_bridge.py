@@ -373,6 +373,45 @@ def bridge_list_instances(include_credentials: bool = False) -> List[Dict]:
         return []
 
 
+def _extract_missing_module(exc: BaseException) -> str:
+    missing = getattr(exc, "name", "")
+    if missing:
+        return str(missing)
+    message = str(exc)
+    marker = "No module named "
+    if marker in message:
+        return message.split(marker, 1)[1].strip(" '")
+    return ""
+
+
+def _format_db_dependency_error(db_type: str, exc: BaseException) -> str:
+    missing = _extract_missing_module(exc)
+    core_install_hint = "请在项目根目录执行 `pip install -e .`，或使用 `pip install -r requirements.txt` 安装基础数据库依赖。"
+    optional_install_hints = {
+        "oracle": "Oracle 驱动未安装。请执行 `pip install -e \".[dba-oracle]\"`，并确认 Oracle Instant Client 已安装且环境变量已配置。",
+        "sqlserver": "SQL Server 驱动未安装。请执行 `pip install -e \".[dba-sqlserver]\"`，并确认系统已安装 ODBC Driver for SQL Server。",
+        "hive": "Hive 驱动未安装。请执行 `pip install -e \".[dba-hive]\"`，并确认 Hadoop / Thrift 相关依赖已就绪。",
+    }
+
+    if missing == "sqlalchemy":
+        return "缺少核心数据库依赖 sqlalchemy。" + core_install_hint
+    if missing in {"pymysql", "psycopg2", "psycopg2_binary"}:
+        return f"缺少 {db_type} 基础驱动模块 {missing}。" + core_install_hint
+    if db_type in optional_install_hints:
+        return optional_install_hints[db_type]
+    return f"数据库连接依赖加载失败: {exc}。" + core_install_hint
+
+
+def _format_db_runtime_error(db_type: str, exc: BaseException) -> Optional[str]:
+    message = str(exc)
+    lowered = message.lower()
+    if db_type == "sqlserver" and ("odbc" in lowered or "driver" in lowered):
+        return "SQL Server ODBC 驱动不可用。请先在系统中安装 ODBC Driver for SQL Server，然后执行 `pip install -e \".[dba-sqlserver]\"`。"
+    if db_type == "oracle" and ("instant client" in lowered or "dpi-1047" in lowered):
+        return "Oracle Instant Client 未就绪。请先安装 Oracle Instant Client，并执行 `pip install -e \".[dba-oracle]\"`。"
+    return None
+
+
 def bridge_test_connection(instance_name: str, direct_creds: Dict = None) -> Dict[str, Any]:
     """Test database connectivity for an instance.
 
@@ -383,7 +422,11 @@ def bridge_test_connection(instance_name: str, direct_creds: Dict = None) -> Dic
                       saved YAML config.  Allows testing *before* saving.
     """
     if not _HAS_CONNECTOR:
-        return {"success": False, "error": "db_connector module not available"}
+        return {
+            "success": False,
+            "error": "DBA 连接器模块不可用，请确认已启用项目插件且 DBA SafeGuard 插件安装完整。",
+        }
+    db_type = "postgresql"
     try:
         import os as _os
         from sqlalchemy import create_engine, text as sa_text
@@ -434,8 +477,19 @@ def bridge_test_connection(instance_name: str, direct_creds: Dict = None) -> Dic
             conn.execute(sa_text("SELECT 1"))
         engine.dispose()
         return {"success": True, "instance": instance_name}
+    except ModuleNotFoundError as e:
+        return {
+            "success": False,
+            "instance": instance_name,
+            "error": _format_db_dependency_error(db_type, e),
+        }
     except Exception as e:
-        return {"success": False, "instance": instance_name, "error": str(e)}
+        friendly_error = _format_db_runtime_error(db_type, e)
+        return {
+            "success": False,
+            "instance": instance_name,
+            "error": friendly_error or str(e),
+        }
 
 
 # ---------------------------------------------------------------------------

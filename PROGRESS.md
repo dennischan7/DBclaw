@@ -1,7 +1,7 @@
 # DB-SafeGuard Enterprise v2.0 — 开发进度跟踪
 
 > **本文档实时记录每个开发任务的完成状态，断线重连后以此为准。**
-> 最后更新: 2026-04-16
+> 最后更新: 2026-04-26
 
 ---
 
@@ -16,6 +16,33 @@
 | **测试数据库** | PostgreSQL 15 @ localhost:5437 (Docker: ent-health-postgres-kimi) |
 | **总测试数** | 392 全部通过 (含39项PG集成测试) |
 | **测试报告** | TEST_REPORT.md (全量报告) + MANUAL_TEST_GUIDE.md (124项人工测试指引) |
+
+---
+
+## 阶段11：数据库依赖通用化与 WebUI 配置体验优化 ✅ 已完成
+
+> 目标：解决 fresh clone 后 WebUI 数据库配置页面缺少 `sqlalchemy` 的部署问题，建立“基础安装默认支持 PostgreSQL / MySQL，重型数据库按需扩展”的依赖模型。
+
+| # | 任务 | 状态 | 备注 |
+|---|------|------|------|
+| 11.1 | 数据库依赖策略重构 | ✅ 已完成 | `sqlalchemy`、`sqlglot`、`pymysql`、`psycopg2-binary` 移入基础依赖 |
+| 11.2 | DBA extras 拆分 | ✅ 已完成 | Oracle / SQL Server / Hive 改为独立 optional extras |
+| 11.3 | WebUI 缺依赖友好提示 | ✅ 已完成 | 配置页测试连接不再直接暴露底层 `No module named ...` |
+| 11.4 | 安装文档更新 | ✅ 已完成 | README 增加默认支持与按需扩展说明 |
+| 11.5 | 数据库驱动专门文档 | ✅ 已完成 | 新增 `docs/database-support.md` |
+| 11.6 | 针对性自动化测试 | ✅ 已完成 | 新增 WebUI 数据库连接测试，覆盖成功与缺驱动场景 |
+
+### Phase 11 关键决策
+
+1. WebUI 的数据库实例配置属于核心功能，因此基础安装必须默认具备 SQLAlchemy 与 PostgreSQL / MySQL 驱动。
+2. Oracle、SQL Server、Hive 保持显式可选安装，因为它们往往依赖系统客户端或平台驱动，不能作为所有开发者的默认前提。
+3. 文档安装入口统一偏向 `pip install -e .`，同时保留 `requirements.txt` 作为快速查看和兼容安装入口。
+
+### Phase 11 关键实现
+
+1. `pyproject.toml` 调整为“核心依赖 + 分库 extras”结构。
+2. `webui/dba_bridge.py` 新增数据库依赖缺失提示与系统驱动缺失提示。
+3. `tests/test_webui_db_connection.py` 覆盖核心连接成功、缺少 SQLAlchemy、缺少 SQL Server 驱动三条关键路径。
 
 ---
 

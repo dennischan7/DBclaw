@@ -4,6 +4,20 @@
 
 旧的 `RELEASE_v0.2.0` 到 `RELEASE_v0.9.0` 文档来自上游 Hermes 基线说明，已归档到 `docs/upstream-notes/`，不计入 DBclaw 的产品版本历史。
 
+## Unreleased
+
+### Highlights
+
+- 基础安装现在默认包含 WebUI 数据库配置页所需的核心数据库依赖
+- fresh clone 后默认支持 PostgreSQL / MySQL 连接测试，不再要求额外研究隐藏 extra
+- Oracle、SQL Server、Hive 调整为按需安装的独立 optional extras
+- WebUI 数据库实例测试连接在缺驱动时返回明确安装提示，而不是直接暴露底层模块导入错误
+
+### Docs
+
+- 更新快速开始安装说明，明确基础安装与扩展数据库驱动的边界
+- 新增 [docs/database-support.md](docs/database-support.md) 作为跨数据库驱动安装指南
+
 ## v0.1.0 - 2026-04-22
 
 首个公开版本。

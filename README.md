@@ -305,7 +305,7 @@ Windows PowerShell 示例：
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -e .
 ```
 
 Linux/macOS Bash 示例：
@@ -313,23 +313,43 @@ Linux/macOS Bash 示例：
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e .
 ```
 如果本机 python 已指向 Python 3，也可以用 python
 
-如果你希望以可编辑模式安装本项目元信息，也可以额外执行：
+如果你更习惯使用 `requirements.txt`，也可以执行：
 
 ```powershell
-pip install -e .
+pip install -r requirements.txt
 ```
 
 Linux/macOS 下对应命令相同：
 
 ```bash
-pip install -e .
+pip install -r requirements.txt
 ```
 
 如果你已经有现成的项目解释器，也可以直接复用，不强制重新创建环境。
+
+数据库依赖策略已经调整为：
+
+- 基础安装默认包含 WebUI 数据库配置页所需的核心依赖，以及 PostgreSQL / MySQL 驱动
+- Oracle、SQL Server、Hive 保持按需安装，避免系统级驱动阻断基础部署
+
+按需扩展安装命令：
+
+```powershell
+# Oracle
+pip install -e ".[dba-oracle]"
+
+# SQL Server
+pip install -e ".[dba-sqlserver]"
+
+# Hive
+pip install -e ".[dba-hive]"
+```
+
+详细的跨数据库安装说明见 [docs/database-support.md](docs/database-support.md)。
 
 ### 2. 启用项目插件
 
